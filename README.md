@@ -1,5 +1,12 @@
 # HTML导出PNG工具
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Demo](https://img.shields.io/badge/demo-visit%20now-green.svg)](https://itshen.github.io/html2png/demo)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/itshen/html2png)
+[![JavaScript](https://img.shields.io/badge/javascript-ES6%2B-yellow)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+
+**🌟 演示地址：** [https://itshen.github.io/html2png/demo](https://itshen.github.io/html2png/demo)
+
 一个**轻量级、零依赖**的JavaScript工具，可以让任何网页快速获得导出PNG图片的能力。
 
 ## ✨ 特点

@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "HTML导出PNG工具",
+  "version": "1.0.0",
+  "description": "一键导出网页元素为PNG图片的浏览器插件",
+  
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "HTML导出PNG工具"
+  },
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  
+  "icons": {
+    "16": "icon16.txt",
+    "48": "icon48.txt", 
+    "128": "icon128.txt"
+  }
+}
