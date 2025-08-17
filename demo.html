@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML导出PNG工具 - 演示页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            color: #7f8c8d;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 4px solid #007bff;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .feature-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .feature-card ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .feature-card li {
+            padding: 5px 0;
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .feature-card li:before {
+            content: '✓';
+            color: #28a745;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        
+        .demo-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+        }
+        
+        .demo-section h2 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+        
+        .demo-section p {
+            font-size: 1.1em;
+            margin-bottom: 20px;
+        }
+        
+        .usage-steps {
+            background: #e8f4fd;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 30px 0;
+        }
+        
+        .usage-steps h3 {
+            color: #007bff;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .step-number {
+            background: #007bff;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .data-visualization {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .chart {
+            display: flex;
+            align-items: end;
+            height: 200px;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .bar {
+            background: linear-gradient(to top, #007bff, #28a745);
+            border-radius: 4px 4px 0 0;
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            min-width: 60px;
+            transition: all 0.3s ease;
+        }
+        
+        .bar:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+        }
+        
+        .code-example {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .code-example::before {
+            content: 'HTML';
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #007bff;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .code-example code {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .highlight-element {
+            background: white;
+            color: #495057;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            border: 2px solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .author-card {
+            background: white;
+            border-radius: 15px;
+            padding: 0;
+            margin: 40px 0;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e9ecef;
+            color: #495057;
+        }
+        
+        .author-header {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .author-header h2 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            color: #343a40;
+        }
+        
+        .author-header p {
+            font-size: 1.1em;
+            color: #6c757d;
+            margin: 0;
+        }
+        
+        .author-content {
+            padding: 30px;
+        }
+        
+        .author-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .author-section:last-of-type {
+            margin-bottom: 0;
+        }
+        
+        .author-section h3 {
+            font-size: 1.3em;
+            margin-bottom: 12px;
+            color: #495057;
+        }
+        
+        .author-section p {
+            line-height: 1.6;
+            color: #6c757d;
+            margin: 0;
+        }
+        
+        .author-list {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 10px;
+        }
+        
+        .author-list li {
+            padding: 5px 0;
+            position: relative;
+            padding-left: 20px;
+            color: #6c757d;
+        }
+        
+        .author-list li:before {
+            content: '•';
+            color: #007bff;
+            position: absolute;
+            left: 0;
+            top: 5px;
+            font-weight: bold;
+        }
+        
+        .author-footer {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            margin: -30px -30px 0 -30px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .author-footer p {
+            margin: 0;
+            font-size: 1.1em;
+            color: #495057;
+        }
+        
+        .author-footer a {
+            color: #007bff;
+            text-decoration: none;
+            border-bottom: 1px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        
+        .author-footer a:hover {
+            color: #0056b3;
+            border-bottom-color: #0056b3;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>HTML导出PNG工具</h1>
+            <p>轻量级、零依赖的网页元素导出解决方案</p>
+        </header>
+
+        <div class="features">
+            <div class="feature-card">
+                <h3>🚀 轻量级设计</h3>
+                <ul>
+                    <li>单文件解决方案</li>
+                    <li>不超过几KB大小</li>
+                    <li>零依赖设计</li>
+                    <li>加载速度极快</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>🎯 简单易用</h3>
+                <ul>
+                    <li>一行代码引入</li>
+                    <li>自动启动运行</li>
+                    <li>无需配置设置</li>
+                    <li>即用即走体验</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>✨ 强大功能</h3>
+                <ul>
+                    <li>智能元素选择</li>
+                    <li>透明背景导出</li>
+                    <li>多种尺寸选项</li>
+                    <li>自动文件命名</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="usage-steps">
+            <h3>📋 使用步骤</h3>
+            <div class="step">
+                <div class="step-number">1</div>
+                <div>点击页面右下角的"导出"按钮进入选择模式</div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div>鼠标移动到想要导出的内容上，元素会显示蓝色高亮边框</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div>点击选中该元素，会弹出导出设置对话框</div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div>选择图片最大宽度（800px、1200px、1920px或原始尺寸）</div>
+            </div>
+            <div class="step">
+                <div class="step-number">5</div>
+                <div>点击"导出PNG"按钮，图片将自动下载到本地</div>
+            </div>
+        </div>
+
+        <div class="code-example">
+            <code>&lt;!-- 在页面底部添加以下代码即可使用 --&gt;<br>
+&lt;script src="html-to-png-exporter.js"&gt;&lt;/script&gt;</code>
+        </div>
+
+        <div class="data-visualization">
+            <h3>📊 数据可视化示例</h3>
+            <p>这是一个示例图表，您可以尝试选择并导出它</p>
+            <div class="chart">
+                <div class="bar" style="height: 60%;">60%</div>
+                <div class="bar" style="height: 80%;">80%</div>
+                <div class="bar" style="height: 45%;">45%</div>
+                <div class="bar" style="height: 90%;">90%</div>
+                <div class="bar" style="height: 70%;">70%</div>
+            </div>
+        </div>
+
+        <div class="highlight-element">
+            <h3>🎨 精美的卡片元素</h3>
+            <p>这是一个可以导出的精美卡片，包含渐变背景和现代化设计。<br>
+            尝试选择这个元素并导出为PNG图片！</p>
+        </div>
+
+        <div class="demo-section">
+            <h2>🚀 立即体验</h2>
+            <p>工具已加载完成！看到右下角的"导出"按钮了吗？</p>
+            <p>点击它开始选择您想要导出的页面元素吧！</p>
+        </div>
+
+        <div class="author-card">
+            <div class="author-header">
+                <h2>👋 嗨，我是洛小山</h2>
+                <p>白天是个爱折腾的 AI 产品经理，晚上是个快乐的小开发~</p>
+            </div>
+            
+            <div class="author-content">
+                <div class="author-section">
+                    <h3>🎯 关于这个工具</h3>
+                    <p>这是我根据公众号读者的需求开发的HTML导出PNG工具，让任何网页都能轻松导出精美的图片，希望能帮你省下宝贵的时间！</p>
+                </div>
+
+                <div class="author-section">
+                    <h3>🚀 更多好玩的</h3>
+                    <p>我还在捣鼓更多有趣的 AI 小工具，会在公众号【洛小山】和大家分享：</p>
+                    <ul class="author-list">
+                        <li>各种实用的 AI 工具</li>
+                        <li>有趣的技术教程</li>
+                        <li>AI 技术到产品的实践</li>
+                        <li>AI 产品拆解</li>
+                    </ul>
+                </div>
+
+                <div class="author-section">
+                    <h3>💡 期待你的想法</h3>
+                    <p>在日常工作或生活中，有没有觉得"要是有个 AI 工具能帮我做这个就好了"？欢迎扫码和我聊聊，说不定你的小需求就能变成下一个实用工具！</p>
+                </div>
+
+                <div class="author-section">
+                    <h3>🐛 遇到问题？</h3>
+                    <p>开发不易，难免有 bug ~ 如果你发现了什么问题，欢迎来和我说说，我会及时修复的！你的反馈就是对我最好的支持 😊</p>
+                </div>
+
+                <div class="author-footer">
+                    <p><strong>🏠 洛小山：</strong> <a href="https://luoxiaoshan.cn" target="_blank">luoxiaoshan.cn</a></p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p> HTML 导出PNG | 洛小山 @ 2025</p>
+        </footer>
+    </div>
+
+    <!-- 引入HTML导出PNG工具 -->
+    <script src="html-to-png-exporter.js"></script>
+</body>
+</html>
