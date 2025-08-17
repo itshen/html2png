@@ -197,6 +197,19 @@
                     <option value="original">原始尺寸</option>
                 </select>
             </div>
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: #555; font-weight: 500;">背景：</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="radio" name="background" value="transparent" checked style="margin: 0;">
+                        <span style="font-size: 14px;">透明背景</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="radio" name="background" value="white" style="margin: 0;">
+                        <span style="font-size: 14px;">白色背景</span>
+                    </label>
+                </div>
+            </div>
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button id="cancelBtn" style="padding: 10px 20px; border: 2px solid #ddd; background: white; color: #666; border-radius: 6px; cursor: pointer; font-size: 14px;">取消</button>
                 <button id="exportBtn" style="padding: 10px 20px; border: none; background: #007bff; color: white; border-radius: 6px; cursor: pointer; font-size: 14px;">导出PNG</button>
@@ -232,6 +245,16 @@
         const widthSelect = document.getElementById('widthSelect');
         const maxWidth = widthSelect.value;
         
+        // 获取背景选项
+        const backgroundRadios = document.getElementsByName('background');
+        let backgroundColor = null; // 默认透明
+        for (const radio of backgroundRadios) {
+            if (radio.checked) {
+                backgroundColor = radio.value === 'white' ? '#ffffff' : null;
+                break;
+            }
+        }
+        
         // 显示导出进度
         const exportBtn = document.getElementById('exportBtn');
         const originalText = exportBtn.textContent;
@@ -243,7 +266,7 @@
             allowTaint: true,
             useCORS: true,
             scale: 2, // 高清导出
-            backgroundColor: null, // 透明背景
+            backgroundColor: backgroundColor, // 根据用户选择设置背景
             logging: false, // 关闭日志
             width: maxWidth === 'original' ? selectedElement.offsetWidth : Math.min(selectedElement.offsetWidth, parseInt(maxWidth)),
             height: maxWidth === 'original' ? selectedElement.offsetHeight : undefined,
