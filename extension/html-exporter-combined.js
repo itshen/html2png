@@ -342,8 +342,8 @@
             scale: 2, // 高清导出
             backgroundColor: backgroundColor, // 根据用户选择设置背景
             logging: false, // 关闭日志
-            width: maxWidth === 'original' ? element.offsetWidth : Math.min(element.offsetWidth, parseInt(maxWidth)),
-            height: maxWidth === 'original' ? element.offsetHeight : undefined,
+            width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
+            height: undefined,
             onclone: function(clonedDoc) {
                 // 确保克隆的文档样式正确
                 return clonedDoc;
