@@ -258,9 +258,9 @@
                 <label style="display: block; margin-bottom: 8px; color: #555; font-weight: 500;">最大宽度：</label>
                 <select id="widthSelect" style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; background: white;">
                     <option value="800">800px</option>
-                    <option value="1200" selected>1200px</option>
+                    <option value="1200">1200px</option>
                     <option value="1920">1920px</option>
-                    <option value="original">原始尺寸</option>
+                    <option value="original" selected>原始尺寸</option>
                 </select>
             </div>
             <div style="margin-bottom: 20px;">
