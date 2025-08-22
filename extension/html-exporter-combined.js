@@ -291,8 +291,8 @@
         window.htmlToPngExporter = false;
     }
     
-    // 直接导出（无对话框） - 旧版本暂时保留
-    function performDirectExport_OLD() {
+    // 直接导出（无对话框）
+    function performDirectExport() {
         if (!selectedElement || isDownloading) return;
         
         isDownloading = true;
