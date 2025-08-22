@@ -461,9 +461,10 @@
                 
                 // 下载完成后，自动重新进入选择模式
                 setTimeout(() => {
-                    if (isDownloading) { // 确保用户没有点击停止
+                    if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
                         selectedElement = null;
                         isDownloading = false;
+                        updateUI('selecting'); // 先更新状态
                         enterSelectionMode();
                     }
                 }, 800);
@@ -525,11 +526,11 @@
                             showToast('备用方案导出成功！', 'success', 2000);
                             
                             setTimeout(() => {
-                                if (toolStatus === 'downloading') {
+                                if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
                                     selectedElement = null;
                                     isDownloading = false;
+                                    updateUI('selecting'); // 先更新状态
                                     enterSelectionMode();
-                                    notifyStatusChange('selecting');
                                 }
                             }, 800);
                             
@@ -555,13 +556,14 @@
     
     // 停止下载流程
     function stopDownloadProcess() {
+        console.log('[Combined] stopDownloadProcess: 强制重置状态');
         isDownloading = false;
         selectedElement = null;
+        updateUI('ready'); // 确保状态正确更新
         if (isSelectionMode) {
             exitSelectionMode();
         }
         showToast('已停止导出流程', 'info', 2000);
-        notifyStatusChange('ready');
     }
     
 
@@ -1260,10 +1262,11 @@
                 
                 // 下载完成后，自动重新进入选择模式
                 setTimeout(() => {
-                    if (toolStatus === 'downloading') { // 确保用户没有点击停止
+                    if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
                         selectedElement = null;
                         isDownloading = false;
-                        startSelection(); // 重新进入选择模式
+                        updateUI('selecting'); // 先更新状态
+                        enterSelectionMode();
                     }
                 }, 800);
                 
@@ -1354,10 +1357,11 @@
                             showToast('备用方案导出成功！', 'success', 2000);
                             
                             setTimeout(() => {
-                                if (toolStatus === 'downloading') {
+                                if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
                                     selectedElement = null;
                                     isDownloading = false;
-                                    startSelection();
+                                    updateUI('selecting'); // 先更新状态
+                                    enterSelectionMode();
                                 }
                             }, 800);
                             
@@ -1381,12 +1385,13 @@
     
     // 停止下载流程
     function stopDownloadProcess() {
+        console.log('[Combined] stopDownloadProcess: 强制重置状态');
         isDownloading = false;
         selectedElement = null;
+        updateUI('ready'); // 确保状态正确更新
         if (isSelectionMode) {
             exitSelectionMode();
         }
-        updateUI('ready');
         showToast('已停止导出流程', 'info', 2000);
     }
     
