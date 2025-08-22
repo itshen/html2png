@@ -1386,14 +1386,8 @@
     
     // 开始选择
     function startSelection() {
-        updateSettings(); // 更新设置
         updateUI('selecting');
         enterSelectionMode();
-    }
-    
-    // 更新设置（从全局设置同步）
-    function updateSettings() {
-        // 这个函数在插件版本中主要是为了兼容，设置已经通过popup传递
     }
     
     // 进入选择模式
