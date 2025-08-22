@@ -31,35 +31,23 @@
     
     let isSelectionMode = false;
     let selectedElement = null;
-    let exportButton = null;
     let exportDialog = null;
     let highlightOverlay = null;
     let blockingOverlay = null;
+    let isDownloading = false;
+    let currentToast = null;
+    let toastContainer = null;
+    let toastCounter = 0;
+    let toolStatus = 'ready'; // ready, selecting, downloading
+    
+    // 全局设置
+    let globalSettings = {
+        backgroundColor: 'transparent',
+        maxWidth: 'original'
+    };
     
     // 样式常量
     const STYLES = {
-        button: `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 999999;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 16px;
-            font-size: 14px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
-            transition: all 0.2s ease;
-            user-select: none;
-        `,
-        buttonHover: `
-            background: #0056b3;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0,123,255,0.4);
-        `,
         overlay: `
             position: fixed;
             top: 0;
@@ -101,29 +89,276 @@
             height: 100%;
             background: rgba(0,0,0,0.5);
             z-index: 999999;
+        `,
+        toastContainer: `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        `,
+        toast: `
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 200px;
+            pointer-events: auto;
+        `,
+        toastShow: `
+            opacity: 1;
+            transform: translateX(0);
+        `,
+        toastSuccess: `
+            background: #28a745;
+        `,
+        toastInfo: `
+            background: #17a2b8;
+        `,
+        toastError: `
+            background: #dc3545;
         `
     };
     
-    // 创建导出按钮
-    function createExportButton() {
-        exportButton = document.createElement('button');
-        exportButton.textContent = '导出';
-        exportButton.style.cssText = STYLES.button;
-        exportButton.setAttribute('data-html-exporter', 'button');
-        
-        exportButton.addEventListener('mouseenter', () => {
-            if (!isSelectionMode) {
-                exportButton.style.cssText = STYLES.button + STYLES.buttonHover;
-            }
-        });
-        
-        exportButton.addEventListener('mouseleave', () => {
-            exportButton.style.cssText = STYLES.button;
-        });
-        
-        exportButton.addEventListener('click', toggleSelectionMode);
-        document.body.appendChild(exportButton);
+    // 创建toast容器
+    function createToastContainer() {
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.style.cssText = STYLES.toastContainer;
+            toastContainer.setAttribute('data-html-exporter', 'toast-container');
+            document.body.appendChild(toastContainer);
+        }
     }
+
+    // 显示Toast提示
+    function showToast(message, type = 'success', duration = 3000) {
+        createToastContainer();
+        
+        // 创建新的toast
+        const toast = document.createElement('div');
+        toast.style.cssText = STYLES.toast;
+        toast.setAttribute('data-html-exporter', 'toast');
+        toast.setAttribute('data-toast-id', ++toastCounter);
+        
+        // 添加图标
+        let icon = '';
+        if (type === 'success') {
+            toast.style.cssText += STYLES.toastSuccess;
+            icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>`;
+        } else if (type === 'info') {
+            toast.style.cssText += STYLES.toastInfo;
+            icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>`;
+        } else if (type === 'error') {
+            toast.style.cssText += STYLES.toastError;
+            icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>`;
+        }
+        
+        toast.innerHTML = `${icon}<span>${message}</span>`;
+        toastContainer.appendChild(toast);
+        
+        // 显示动画
+        setTimeout(() => {
+            toast.style.cssText += STYLES.toastShow;
+        }, 10);
+        
+        // 自动隐藏
+        setTimeout(() => {
+            if (toast && toast.parentNode) {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast && toast.parentNode) {
+                        toast.remove();
+                        
+                        // 如果容器为空，移除容器
+                        if (toastContainer && toastContainer.children.length === 0) {
+                            toastContainer.remove();
+                            toastContainer = null;
+                        }
+                    }
+                }, 300);
+            }
+        }, duration);
+        
+        return toast;
+    }
+
+    // 消息监听器
+    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+        switch (request.action) {
+            case 'getStatus':
+                sendResponse({status: toolStatus});
+                break;
+                
+            case 'updateSettings':
+                if (request.settings) {
+                    globalSettings.backgroundColor = request.settings.backgroundColor === 'transparent' ? 'transparent' : '#ffffff';
+                    globalSettings.maxWidth = request.settings.maxWidth;
+                }
+                sendResponse({success: true});
+                break;
+                
+            case 'startSelection':
+                enterSelectionMode();
+                sendResponse({success: true});
+                break;
+                
+            case 'cancelSelection':
+                if (isSelectionMode) {
+                    exitSelectionMode();
+                }
+                sendResponse({success: true});
+                break;
+                
+            case 'stop':
+                stopDownloadProcess();
+                sendResponse({success: true});
+                break;
+                
+            case 'deactivate':
+                deactivateTool();
+                sendResponse({success: true});
+                break;
+                
+            default:
+                sendResponse({success: false});
+        }
+    });
+    
+    // 通知popup状态变化
+    function notifyStatusChange(status) {
+        toolStatus = status;
+        chrome.runtime.sendMessage({
+            action: 'statusUpdate',
+            status: status
+        }).catch(() => {
+            // popup可能已关闭，忽略错误
+        });
+    }
+    
+    // 停用工具
+    function deactivateTool() {
+        // 清理所有元素
+        if (highlightOverlay) {
+            highlightOverlay.remove();
+        }
+        if (blockingOverlay) {
+            blockingOverlay.remove();
+        }
+        if (toastContainer) {
+            toastContainer.remove();
+            toastContainer = null;
+        }
+        
+        // 退出选择模式
+        if (isSelectionMode) {
+            exitSelectionMode();
+        }
+        
+        // 重置状态
+        isDownloading = false;
+        selectedElement = null;
+        
+        // 标记工具为已停用
+        window.htmlToPngExporter = false;
+    }
+    
+    // 直接导出（无对话框）
+    function performDirectExport() {
+        if (!selectedElement || isDownloading) return;
+        
+        isDownloading = true;
+        notifyStatusChange('downloading');
+        
+        // 显示下载开始的toast
+        showToast('开始导出...', 'info', 2000);
+        
+        const backgroundColor = globalSettings.backgroundColor;
+        const maxWidth = globalSettings.maxWidth;
+        
+        console.log('开始导出...', { backgroundColor, maxWidth });
+        
+        html2canvas(selectedElement, {
+            allowTaint: true,
+            useCORS: true,
+            scale: 2,
+            backgroundColor: backgroundColor,
+            logging: false,
+            width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
+            height: undefined
+        }).then(canvas => {
+            console.log('Canvas创建成功:', canvas.width + 'x' + canvas.height);
+            
+            try {
+                const link = document.createElement('a');
+                const fileName = `html-export-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                link.download = fileName;
+                link.href = canvas.toDataURL('image/png');
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                console.log('图片下载完成:', fileName);
+                
+                // 显示下载成功的toast
+                showToast('下载成功，你可以继续选择下一个元素！', 'success', 2000);
+                
+                // 下载完成后，自动重新进入选择模式
+                setTimeout(() => {
+                    if (isDownloading) { // 确保用户没有点击停止
+                        selectedElement = null;
+                        isDownloading = false;
+                        enterSelectionMode();
+                    }
+                }, 800);
+                
+            } catch (error) {
+                console.error('下载过程出错:', error);
+                showToast('下载失败，请重试', 'error', 3000);
+                stopDownloadProcess();
+            }
+            
+        }).catch(error => {
+            console.error('导出失败:', error);
+            showToast('导出失败，请重试', 'error', 3000);
+            stopDownloadProcess();
+        });
+    }
+    
+
+    
+    // 停止下载流程
+    function stopDownloadProcess() {
+        isDownloading = false;
+        selectedElement = null;
+        if (isSelectionMode) {
+            exitSelectionMode();
+        }
+        showToast('已停止导出流程', 'info', 2000);
+        notifyStatusChange('ready');
+    }
+    
+
     
     // 创建高亮覆盖层
     function createHighlightOverlay() {
@@ -143,21 +378,15 @@
         document.body.appendChild(blockingOverlay);
     }
     
-    // 切换选择模式
-    function toggleSelectionMode() {
-        if (isSelectionMode) {
-            exitSelectionMode();
-        } else {
-            enterSelectionMode();
-        }
-    }
-    
     // 进入选择模式
     function enterSelectionMode() {
+        console.log('进入选择模式，highlightOverlay:', !!highlightOverlay, 'blockingOverlay:', !!blockingOverlay);
         isSelectionMode = true;
-        exportButton.textContent = '取消';
-        exportButton.style.background = '#dc3545';
         document.body.style.cursor = 'crosshair';
+        notifyStatusChange('selecting');
+        
+        // 显示提示
+        showToast('点击页面元素开始导出', 'info', 3000);
         
         // 添加事件监听器 - 使用capture阶段确保优先处理
         document.addEventListener('mousemove', handleMouseMove, true);
@@ -176,9 +405,8 @@
     // 退出选择模式
     function exitSelectionMode() {
         isSelectionMode = false;
-        exportButton.textContent = '导出';
-        exportButton.style.background = '#007bff';
         document.body.style.cursor = '';
+        notifyStatusChange('ready');
         
         // 移除事件监听器 - 必须与添加时的参数一致
         document.removeEventListener('mousemove', handleMouseMove, true);
@@ -203,7 +431,7 @@
         const element = document.elementFromPoint(e.clientX, e.clientY);
         blockingOverlay.style.display = 'block';
         
-        if (!element || element === exportButton || element === highlightOverlay || element === blockingOverlay) return;
+        if (!element || element === highlightOverlay || element === blockingOverlay) return;
         
         const rect = element.getBoundingClientRect();
         highlightOverlay.style.left = rect.left + 'px';
@@ -226,11 +454,15 @@
         const element = document.elementFromPoint(e.clientX, e.clientY);
         blockingOverlay.style.display = 'block';
         
-        if (!element || element === exportButton || element === highlightOverlay || element === blockingOverlay) return;
+        if (!element || element === highlightOverlay || element === blockingOverlay) return;
         
         selectedElement = element;
         exitSelectionMode();
-        showExportDialog();
+        
+        // 选择元素后立即开始导出
+        setTimeout(() => {
+            performDirectExport();
+        }, 200); // 给用户一点时间看到选择效果
     }
     
     // 处理键盘事件
@@ -409,7 +641,6 @@
         }
         
         // 创建UI元素
-        createExportButton();
         createHighlightOverlay();
         createBlockingOverlay();
         

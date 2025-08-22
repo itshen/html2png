@@ -27,8 +27,9 @@
   ],
   
   "icons": {
-    "16": "icon16.txt",
-    "48": "icon48.txt", 
-    "128": "icon128.txt"
+    "16": "icon/icon_16x16.png",
+    "32": "icon/icon_32x32.png",
+    "64": "icon/icon_64x64.png",
+    "128": "icon/icon_128x128.png"
   }
 }

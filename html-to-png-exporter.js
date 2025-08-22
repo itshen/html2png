@@ -12,16 +12,34 @@
     let isSelectionMode = false;
     let selectedElement = null;
     let exportButton = null;
+    let settingsButton = null;
+    let stopButton = null;
     let exportDialog = null;
+    let settingsPanel = null;
     let highlightOverlay = null;
+    let blockingOverlay = null;
+    let isDownloading = false;
+    let currentToast = null;
+    
+    // 全局设置
+    let globalSettings = {
+        backgroundColor: 'transparent',
+        maxWidth: 'original'
+    };
     
     // 样式常量
     const STYLES = {
-        button: `
+        buttonContainer: `
             position: fixed;
             bottom: 20px;
             right: 20px;
             z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        `,
+        button: `
             background: #007bff;
             color: white;
             border: none;
@@ -33,6 +51,38 @@
             box-shadow: 0 4px 12px rgba(0,123,255,0.3);
             transition: all 0.2s ease;
             user-select: none;
+            min-width: 80px;
+        `,
+        settingsButton: `
+            width: 40px;
+            height: 40px;
+            padding: 8px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(108,117,125,0.3);
+            transition: all 0.2s ease;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `,
+        stopButton: `
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(220,53,69,0.3);
+            transition: all 0.2s ease;
+            user-select: none;
+            min-width: 80px;
+            display: none;
         `,
         buttonHover: `
             background: #0056b3;
@@ -48,6 +98,17 @@
             background: rgba(0,123,255,0.1);
             z-index: 999998;
             transition: all 0.1s ease;
+        `,
+        blockingOverlay: `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: transparent;
+            z-index: 999997;
+            pointer-events: auto;
+            cursor: crosshair;
         `,
         dialog: `
             position: fixed;
@@ -70,27 +131,421 @@
             height: 100%;
             background: rgba(0,0,0,0.5);
             z-index: 999999;
+        `,
+        settingsPanel: `
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-width: 240px;
+            z-index: 999998;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            pointer-events: none;
+        `,
+        settingsPanelShow: `
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        `,
+        toast: `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+            z-index: 1000000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 200px;
+        `,
+        toastShow: `
+            opacity: 1;
+            transform: translateX(0);
+        `,
+        toastSuccess: `
+            background: #28a745;
+        `,
+        toastInfo: `
+            background: #17a2b8;
+        `,
+        toastError: `
+            background: #dc3545;
         `
     };
     
-    // 创建导出按钮
-    function createExportButton() {
+    // 显示Toast提示
+    function showToast(message, type = 'success', duration = 3000) {
+        // 移除现有toast
+        if (currentToast) {
+            currentToast.remove();
+        }
+        
+        // 创建新的toast
+        currentToast = document.createElement('div');
+        currentToast.style.cssText = STYLES.toast;
+        currentToast.setAttribute('data-html-exporter', 'toast');
+        
+        // 添加图标
+        let icon = '';
+        if (type === 'success') {
+            currentToast.style.cssText += STYLES.toastSuccess;
+            icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>`;
+        } else if (type === 'info') {
+            currentToast.style.cssText += STYLES.toastInfo;
+            icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>`;
+        } else if (type === 'error') {
+            currentToast.style.cssText += STYLES.toastError;
+            icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>`;
+        }
+        
+        currentToast.innerHTML = `${icon}<span>${message}</span>`;
+        document.body.appendChild(currentToast);
+        
+        // 显示动画
+        setTimeout(() => {
+            currentToast.style.cssText += STYLES.toastShow;
+        }, 10);
+        
+        // 自动隐藏
+        setTimeout(() => {
+            if (currentToast) {
+                currentToast.style.opacity = '0';
+                currentToast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (currentToast) {
+                        currentToast.remove();
+                        currentToast = null;
+                    }
+                }, 300);
+            }
+        }, duration);
+        
+        return currentToast;
+    }
+
+    // 创建按钮组
+    function createButtons() {
+        // 创建按钮容器
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = STYLES.buttonContainer;
+        buttonContainer.setAttribute('data-html-exporter', 'container');
+        
+        // 创建设置面板
+        createSettingsPanel();
+        
+        // 创建设置按钮（齿轮图标）
+        settingsButton = document.createElement('button');
+        settingsButton.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5zm7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97L2.46 14.6c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64L19.43 13z"/>
+            </svg>
+        `;
+        settingsButton.style.cssText = STYLES.settingsButton;
+        settingsButton.setAttribute('data-html-exporter', 'settings');
+        settingsButton.addEventListener('click', toggleSettingsPanel);
+        
+        // 设置按钮hover效果
+        settingsButton.addEventListener('mouseenter', () => {
+            settingsButton.style.background = '#5a6268';
+            settingsButton.style.transform = 'scale(1.05)';
+        });
+        
+        settingsButton.addEventListener('mouseleave', () => {
+            settingsButton.style.background = '#6c757d';
+            settingsButton.style.transform = 'scale(1)';
+        });
+        
+        // 创建导出按钮
         exportButton = document.createElement('button');
         exportButton.textContent = '导出';
         exportButton.style.cssText = STYLES.button;
+        exportButton.setAttribute('data-html-exporter', 'export');
         
+        // 创建停止按钮
+        stopButton = document.createElement('button');
+        stopButton.textContent = '停止';
+        stopButton.style.cssText = STYLES.stopButton;
+        stopButton.setAttribute('data-html-exporter', 'stop');
+        stopButton.addEventListener('click', stopDownloadProcess);
+        
+        // 停止按钮hover效果
+        stopButton.addEventListener('mouseenter', () => {
+            if (isDownloading) {
+                stopButton.style.background = '#c82333';
+                stopButton.style.transform = 'translateY(-1px)';
+            }
+        });
+        
+        stopButton.addEventListener('mouseleave', () => {
+            if (isDownloading) {
+                stopButton.style.background = '#dc3545';
+                stopButton.style.transform = 'translateY(0)';
+            }
+        });
+        
+        // 导出按钮事件
         exportButton.addEventListener('mouseenter', () => {
-            if (!isSelectionMode) {
+            if (!isSelectionMode && !isDownloading) {
                 exportButton.style.cssText = STYLES.button + STYLES.buttonHover;
             }
         });
         
         exportButton.addEventListener('mouseleave', () => {
-            exportButton.style.cssText = STYLES.button;
+            if (!isDownloading) {
+                exportButton.style.cssText = STYLES.button;
+            }
         });
         
-        exportButton.addEventListener('click', toggleSelectionMode);
-        document.body.appendChild(exportButton);
+        exportButton.addEventListener('click', handleExportClick);
+        
+        // 组装按钮
+        buttonContainer.appendChild(settingsButton);
+        buttonContainer.appendChild(exportButton);
+        buttonContainer.appendChild(stopButton);
+        document.body.appendChild(buttonContainer);
+    }
+    
+    // 创建设置面板
+    function createSettingsPanel() {
+        settingsPanel = document.createElement('div');
+        settingsPanel.style.cssText = STYLES.settingsPanel;
+        settingsPanel.setAttribute('data-html-exporter', 'settings-panel');
+        
+        settingsPanel.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: 600;">导出设置</h4>
+                <div id="downloadStatus" style="display: none; width: 8px; height: 8px; background: #28a745; border-radius: 50%; animation: pulse 1s infinite;"></div>
+            </div>
+            <style>
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
+                }
+            </style>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; color: #555; font-size: 14px; font-weight: 500;">背景:</label>
+                <div style="display: flex; gap: 8px;">
+                    <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                        <input type="radio" name="background" value="transparent" checked style="margin-right: 6px;">
+                        透明
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                        <input type="radio" name="background" value="white" style="margin-right: 6px;">
+                        白底
+                    </label>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 0;">
+                <label style="display: block; margin-bottom: 6px; color: #555; font-size: 14px; font-weight: 500;">尺寸:</label>
+                <select id="sizeSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    <option value="original">原始尺寸</option>
+                    <option value="800">800px宽</option>
+                    <option value="1200">1200px宽</option>
+                    <option value="1600">1600px宽</option>
+                    <option value="1920">1920px宽</option>
+                </select>
+            </div>
+        `;
+        
+        document.body.appendChild(settingsPanel);
+        
+        // 绑定设置变化事件
+        const bgRadios = settingsPanel.querySelectorAll('input[name="background"]');
+        bgRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                globalSettings.backgroundColor = e.target.value === 'transparent' ? 'transparent' : '#ffffff';
+            });
+        });
+        
+        const sizeSelect = settingsPanel.querySelector('#sizeSelect');
+        sizeSelect.addEventListener('change', (e) => {
+            globalSettings.maxWidth = e.target.value;
+        });
+    }
+    
+    // 切换设置面板显示
+    function toggleSettingsPanel() {
+        const isVisible = settingsPanel.style.cssText.includes(STYLES.settingsPanelShow);
+        
+        if (isVisible) {
+            hideSettingsPanel();
+        } else {
+            showSettingsPanel();
+        }
+    }
+    
+    // 显示设置面板
+    function showSettingsPanel() {
+        settingsPanel.style.cssText = STYLES.settingsPanel + STYLES.settingsPanelShow;
+        // 添加点击外部关闭的事件监听，延迟以避免立即触发
+        setTimeout(() => {
+            document.addEventListener('click', handleOutsideClick, true);
+        }, 150);
+    }
+    
+    // 隐藏设置面板
+    function hideSettingsPanel() {
+        if (settingsPanel && settingsPanel.style.cssText.includes(STYLES.settingsPanelShow)) {
+            settingsPanel.style.cssText = STYLES.settingsPanel;
+            document.removeEventListener('click', handleOutsideClick, true);
+        }
+    }
+    
+    // 处理点击外部关闭设置面板
+    function handleOutsideClick(e) {
+        const isSettingsArea = settingsPanel.contains(e.target) || settingsButton.contains(e.target);
+        const isPanelVisible = settingsPanel.style.cssText.includes(STYLES.settingsPanelShow);
+        
+        if (!isSettingsArea && isPanelVisible) {
+            hideSettingsPanel();
+        }
+    }
+    
+    // 处理导出按钮点击
+    function handleExportClick() {
+        if (isSelectionMode) {
+            exitSelectionMode();
+        } else if (selectedElement) {
+            // 已选择元素，直接导出
+            performDirectExport();
+        } else {
+            // 进入选择模式
+            enterSelectionMode();
+        }
+    }
+    
+    // 直接导出（无对话框）
+    function performDirectExport() {
+        if (!selectedElement || isDownloading) return;
+        
+        isDownloading = true;
+        updateButtonStates();
+        
+        // 显示下载开始的toast
+        showToast('开始导出...', 'info', 2000);
+        
+        const backgroundColor = globalSettings.backgroundColor;
+        const maxWidth = globalSettings.maxWidth;
+        
+        console.log('开始导出...', { backgroundColor, maxWidth });
+        
+        html2canvas(selectedElement, {
+            allowTaint: true,
+            useCORS: true,
+            scale: 2,
+            backgroundColor: backgroundColor,
+            logging: false,
+            width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
+            height: undefined
+        }).then(canvas => {
+            console.log('Canvas创建成功:', canvas.width + 'x' + canvas.height);
+            
+            try {
+                const link = document.createElement('a');
+                const fileName = `html-export-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                link.download = fileName;
+                link.href = canvas.toDataURL('image/png');
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                console.log('图片下载完成:', fileName);
+                
+                // 显示下载成功的toast
+                showToast('下载成功！继续选择下一个元素', 'success', 2000);
+                
+                // 下载完成后，自动重新进入选择模式
+                setTimeout(() => {
+                    if (isDownloading) { // 确保用户没有点击停止
+                        selectedElement = null;
+                        isDownloading = false;
+                        enterSelectionMode();
+                    }
+                }, 800);
+                
+            } catch (error) {
+                console.error('下载过程出错:', error);
+                showToast('下载失败，请重试', 'error', 3000);
+                stopDownloadProcess();
+            }
+            
+        }).catch(error => {
+            console.error('导出失败:', error);
+            showToast('导出失败，请重试', 'error', 3000);
+            stopDownloadProcess();
+        });
+    }
+    
+    // 停止下载流程
+    function stopDownloadProcess() {
+        isDownloading = false;
+        selectedElement = null;
+        if (isSelectionMode) {
+            exitSelectionMode();
+        }
+        showToast('已停止导出流程', 'info', 2000);
+        updateButtonStates();
+    }
+    
+    // 更新按钮状态
+    function updateButtonStates() {
+        if (isDownloading) {
+            exportButton.textContent = '处理中...';
+            exportButton.style.background = '#17a2b8';
+            stopButton.style.display = 'block';
+            
+            // 显示状态指示器
+            const statusIndicator = document.getElementById('downloadStatus');
+            if (statusIndicator) {
+                statusIndicator.style.display = 'block';
+            }
+        } else if (isSelectionMode) {
+            exportButton.textContent = '取消';
+            exportButton.style.background = '#dc3545';
+            stopButton.style.display = 'none';
+            
+            // 隐藏状态指示器
+            const statusIndicator = document.getElementById('downloadStatus');
+            if (statusIndicator) {
+                statusIndicator.style.display = 'none';
+            }
+        } else {
+            exportButton.textContent = selectedElement ? '导出' : '开始';
+            exportButton.style.background = '#007bff';
+            stopButton.style.display = 'none';
+            
+            // 隐藏状态指示器
+            const statusIndicator = document.getElementById('downloadStatus');
+            if (statusIndicator) {
+                statusIndicator.style.display = 'none';
+            }
+        }
     }
     
     // 创建高亮覆盖层
@@ -98,16 +553,22 @@
         highlightOverlay = document.createElement('div');
         highlightOverlay.style.cssText = STYLES.overlay;
         highlightOverlay.style.display = 'none';
+        highlightOverlay.setAttribute('data-html-exporter', 'overlay');
         document.body.appendChild(highlightOverlay);
     }
     
-    // 切换选择模式
+    // 创建阻止交互的覆盖层
+    function createBlockingOverlay() {
+        blockingOverlay = document.createElement('div');
+        blockingOverlay.style.cssText = STYLES.blockingOverlay;
+        blockingOverlay.style.display = 'none';
+        blockingOverlay.setAttribute('data-html-exporter', 'blocking');
+        document.body.appendChild(blockingOverlay);
+    }
+    
+    // 切换选择模式（保留兼容性）
     function toggleSelectionMode() {
-        if (isSelectionMode) {
-            exitSelectionMode();
-        } else {
-            enterSelectionMode();
-        }
+        handleExportClick();
     }
     
     // 进入选择模式
@@ -117,27 +578,36 @@
         exportButton.style.background = '#dc3545';
         document.body.style.cursor = 'crosshair';
         
-        // 添加事件监听器
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('click', handleElementClick);
-        document.addEventListener('keydown', handleKeyDown);
+        // 隐藏设置面板
+        hideSettingsPanel();
         
+        // 显示提示
+        showToast('点击页面元素开始导出', 'info', 3000);
+        
+        // 添加事件监听器 - 使用capture阶段确保优先处理
+        document.addEventListener('mousemove', handleMouseMove, true);
+        document.addEventListener('click', handleElementClick, true);
+        document.addEventListener('keydown', handleKeyDown, true);
+        
+        // 显示覆盖层
+        blockingOverlay.style.display = 'block';
         highlightOverlay.style.display = 'block';
     }
     
     // 退出选择模式
     function exitSelectionMode() {
         isSelectionMode = false;
-        exportButton.textContent = '导出';
-        exportButton.style.background = '#007bff';
         document.body.style.cursor = '';
+        updateButtonStates();
         
-        // 移除事件监听器
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('click', handleElementClick);
-        document.removeEventListener('keydown', handleKeyDown);
+        // 移除事件监听器 - 必须与添加时的参数一致
+        document.removeEventListener('mousemove', handleMouseMove, true);
+        document.removeEventListener('click', handleElementClick, true);
+        document.removeEventListener('keydown', handleKeyDown, true);
         
+        // 隐藏覆盖层
         highlightOverlay.style.display = 'none';
+        blockingOverlay.style.display = 'none';
     }
     
     // 处理鼠标移动
@@ -145,7 +615,9 @@
         if (!isSelectionMode) return;
         
         const element = document.elementFromPoint(e.clientX, e.clientY);
-        if (!element || element === exportButton || element === highlightOverlay) return;
+        blockingOverlay.style.display = 'block';
+        
+        if (!element || element === exportButton || element === highlightOverlay || element === blockingOverlay) return;
         
         const rect = element.getBoundingClientRect();
         highlightOverlay.style.left = rect.left + 'px';
@@ -162,11 +634,17 @@
         e.stopPropagation();
         
         const element = document.elementFromPoint(e.clientX, e.clientY);
-        if (!element || element === exportButton || element === highlightOverlay) return;
+        blockingOverlay.style.display = 'block';
+        
+        if (!element || element === exportButton || element === highlightOverlay || element === blockingOverlay) return;
         
         selectedElement = element;
         exitSelectionMode();
-        showExportDialog();
+        
+        // 选择元素后立即开始导出
+        setTimeout(() => {
+            performDirectExport();
+        }, 200); // 给用户一点时间看到选择效果
     }
     
     // 处理键盘事件
@@ -176,15 +654,17 @@
         }
     }
     
-    // 显示导出对话框
+    // 显示导出对话框（保留兼容性，但现在不再使用）
     function showExportDialog() {
         // 创建背景遮罩
         const backdrop = document.createElement('div');
         backdrop.style.cssText = STYLES.dialogBackdrop;
+        backdrop.setAttribute('data-html-exporter', 'backdrop');
         
         // 创建对话框
         exportDialog = document.createElement('div');
         exportDialog.style.cssText = STYLES.dialog;
+        exportDialog.setAttribute('data-html-exporter', 'dialog');
         
         exportDialog.innerHTML = `
             <h3 style="margin: 0 0 20px 0; color: #333; font-size: 18px;">导出设置</h3>
@@ -240,7 +720,7 @@
         }
     }
     
-    // 执行导出
+    // 执行导出（保留兼容性，但现在不再使用）
     function performExport() {
         const widthSelect = document.getElementById('widthSelect');
         const maxWidth = widthSelect.value;
@@ -352,12 +832,15 @@
         
         // 加载html2canvas库
         loadHtml2Canvas().then(() => {
-            createExportButton();
+            // 创建UI元素
+            createButtons();
             createHighlightOverlay();
-            console.log('HTML导出PNG工具已加载完成');
+            createBlockingOverlay();
+            
+            console.log('HTML导出PNG工具已加载完成，新版本带有连续选择功能');
         }).catch(error => {
             console.error('加载html2canvas库失败:', error);
-            alert('工具初始化失败，请检查网络连接');
+            showToast('工具初始化失败，请检查网络连接', 'error', 5000);
         });
     }
     
