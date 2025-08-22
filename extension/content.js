@@ -41,20 +41,7 @@
                 sendResponse({success: true});
                 break;
                 
-            case 'startSelection':
-                console.log('[Content] 收到startSelection请求');
-                console.log('[Content] window.htmlToPngExporter存在:', !!window.htmlToPngExporter);
-                console.log('[Content] startSelection方法存在:', !!(window.htmlToPngExporter && window.htmlToPngExporter.startSelection));
-                
-                if (window.htmlToPngExporter && window.htmlToPngExporter.startSelection) {
-                    console.log('[Content] 调用startSelection方法');
-                    window.htmlToPngExporter.startSelection();
-                    sendResponse({success: true});
-                } else {
-                    console.log('[Content] startSelection方法不存在');
-                    sendResponse({success: false});
-                }
-                break;
+            // startSelection 消息处理已移除，统一使用直接 API 调用
                 
             case 'cancelSelection':
                 if (window.htmlToPngExporter && window.htmlToPngExporter.cancelSelection) {

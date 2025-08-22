@@ -213,14 +213,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 开始选择
     function startSelection() {
-        console.log('[Popup] startSelection被调用，发送startSelection消息');
-        chrome.tabs.sendMessage(currentTabId, {action: 'startSelection'}, function(response) {
-            console.log('[Popup] startSelection响应:', response);
-            if (response && response.success) {
+        console.log('[Popup] startSelection被调用，直接调用API');
+        // 直接调用API，不再使用消息机制
+        chrome.scripting.executeScript({
+            target: {tabId: currentTabId},
+            func: () => {
+                if (window.htmlToPngExporter && window.htmlToPngExporter.startSelection) {
+                    console.log('[Popup] 调用API: window.htmlToPngExporter.startSelection()');
+                    window.htmlToPngExporter.startSelection();
+                } else {
+                    console.log('[Popup] API不存在');
+                }
+            }
+        }, function() {
+            if (chrome.runtime.lastError) {
+                console.log('[Popup] 执行脚本失败:', chrome.runtime.lastError);
+            } else {
                 console.log('[Popup] 开始选择成功，更新UI为selecting');
                 updateUI('selecting');
-            } else {
-                console.log('[Popup] 开始选择失败');
             }
         });
     }
