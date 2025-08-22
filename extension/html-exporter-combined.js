@@ -231,8 +231,9 @@
                 break;
                 
             case 'startSelection':
-                enterSelectionMode();
-                sendResponse({success: true});
+                // 这个消息处理已废弃，统一使用API调用
+                console.log('[Combined] 收到startSelection消息，但此处理器已废弃');
+                sendResponse({success: false, message: 'deprecated'});
                 break;
                 
             case 'cancelSelection':
