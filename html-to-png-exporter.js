@@ -419,7 +419,7 @@
             
             <div style="margin-bottom: 16px;">
                 <label style="display: block; margin-bottom: 6px; color: #555; font-size: 14px; font-weight: 500;">背景:</label>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
                         <input type="radio" name="background" value="transparent" checked style="margin-right: 6px;">
                         透明
@@ -427,6 +427,10 @@
                     <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
                         <input type="radio" name="background" value="white" style="margin-right: 6px;">
                         白底
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px;">
+                        <input type="radio" name="background" value="original" style="margin-right: 6px;">
+                        原文档
                     </label>
                 </div>
             </div>
@@ -449,7 +453,13 @@
         const bgRadios = settingsPanel.querySelectorAll('input[name="background"]');
         bgRadios.forEach(radio => {
             radio.addEventListener('change', (e) => {
-                globalSettings.backgroundColor = e.target.value === 'transparent' ? 'transparent' : '#ffffff';
+                if (e.target.value === 'transparent') {
+                    globalSettings.backgroundColor = 'transparent';
+                } else if (e.target.value === 'white') {
+                    globalSettings.backgroundColor = '#ffffff';
+                } else if (e.target.value === 'original') {
+                    globalSettings.backgroundColor = 'original';
+                }
             });
         });
         
@@ -598,7 +608,13 @@
         if (bgRadios.length > 0) {
             for (const radio of bgRadios) {
                 if (radio.checked) {
-                    globalSettings.backgroundColor = radio.value === 'transparent' ? 'transparent' : '#ffffff';
+                    if (radio.value === 'transparent') {
+                        globalSettings.backgroundColor = 'transparent';
+                    } else if (radio.value === 'white') {
+                        globalSettings.backgroundColor = '#ffffff';
+                    } else if (radio.value === 'original') {
+                        globalSettings.backgroundColor = 'original';
+                    }
                     break;
                 }
             }
@@ -629,16 +645,137 @@
         
         console.log('开始导出...', { backgroundColor, maxWidth });
         
-        html2canvas(selectedElement, {
+        // 预先处理页面中的oklch颜色，防止html2canvas解析错误
+        const originalStyles = new Map();
+        try {
+            const allElements = document.querySelectorAll('*');
+            allElements.forEach(el => {
+                const computedStyle = window.getComputedStyle(el);
+                const fixes = {};
+                
+                // 检查并临时替换oklch颜色
+                if (computedStyle.color && computedStyle.color.includes('oklch')) {
+                    fixes.color = el.style.color;
+                    el.style.setProperty('color', 'rgb(0, 0, 0)', 'important');
+                }
+                if (computedStyle.backgroundColor && computedStyle.backgroundColor.includes('oklch')) {
+                    fixes.backgroundColor = el.style.backgroundColor;
+                    el.style.setProperty('background-color', 'transparent', 'important');
+                }
+                if (computedStyle.borderColor && computedStyle.borderColor.includes('oklch')) {
+                    fixes.borderColor = el.style.borderColor;
+                    el.style.setProperty('border-color', 'rgb(0, 0, 0)', 'important');
+                }
+                
+                if (Object.keys(fixes).length > 0) {
+                    originalStyles.set(el, fixes);
+                }
+            });
+            console.log(`预处理了 ${originalStyles.size} 个包含oklch的元素`);
+        } catch (preError) {
+            console.warn('预处理oklch颜色时出错:', preError);
+        }
+        
+        // 根据背景设置配置html2canvas选项
+        const canvasOptions = {
             allowTaint: true,
             useCORS: true,
             scale: 2,
-            backgroundColor: backgroundColor,
             logging: false,
             width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
-            height: undefined
-        }).then(canvas => {
+            height: undefined,
+            ignoreElements: function(element) {
+                // 忽略可能包含不支持CSS的元素
+                return false;
+            },
+            onclone: function(clonedDoc) {
+                // 在克隆的文档中移除可能导致问题的CSS样式
+                try {
+                    // 只处理oklch颜色问题，保持其他样式不变
+                    const allElements = clonedDoc.querySelectorAll('*');
+                    allElements.forEach(el => {
+                        try {
+                            const computedStyle = window.getComputedStyle(el);
+                            
+                            // 只替换包含oklch的颜色，保持其他背景样式
+                            if (computedStyle.color && computedStyle.color.includes('oklch')) {
+                                el.style.color = 'rgb(0, 0, 0)';
+                            }
+                            if (computedStyle.backgroundColor && computedStyle.backgroundColor.includes('oklch')) {
+                                // 如果是原文档背景模式，尝试从父元素获取背景色
+                                if (backgroundColor === 'original' && el.parentElement) {
+                                    const parentBg = window.getComputedStyle(el.parentElement).backgroundColor;
+                                    if (parentBg && !parentBg.includes('oklch') && parentBg !== 'rgba(0, 0, 0, 0)') {
+                                        el.style.backgroundColor = parentBg;
+                                    } else {
+                                        el.style.backgroundColor = 'transparent';
+                                    }
+                                } else {
+                                    el.style.backgroundColor = 'transparent';
+                                }
+                            }
+                            if (computedStyle.borderColor && computedStyle.borderColor.includes('oklch')) {
+                                el.style.borderColor = 'rgb(0, 0, 0)';
+                            }
+                        } catch (styleError) {
+                            // 忽略单个元素的样式错误
+                        }
+                    });
+                    
+                    // 确保body和html元素保持原始背景（如果是原文档模式）
+                    if (backgroundColor === 'original') {
+                        const bodyEl = clonedDoc.body;
+                        const htmlEl = clonedDoc.documentElement;
+                        
+                        // 保持body的原始背景
+                        if (bodyEl && !window.getComputedStyle(bodyEl).backgroundColor.includes('oklch')) {
+                            const originalBodyBg = window.getComputedStyle(document.body).backgroundColor;
+                            if (originalBodyBg && originalBodyBg !== 'rgba(0, 0, 0, 0)') {
+                                bodyEl.style.backgroundColor = originalBodyBg;
+                            }
+                        }
+                        
+                        // 保持html的原始背景
+                        if (htmlEl && !window.getComputedStyle(htmlEl).backgroundColor.includes('oklch')) {
+                            const originalHtmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+                            if (originalHtmlBg && originalHtmlBg !== 'rgba(0, 0, 0, 0)') {
+                                htmlEl.style.backgroundColor = originalHtmlBg;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('清理oklch颜色时出错:', e);
+                }
+                return clonedDoc;
+            }
+        };
+        
+        // 根据背景设置配置backgroundColor
+        if (backgroundColor === 'original') {
+            // 原文档背景：设置为null让html2canvas使用透明背景，这样能保持元素的原始背景
+            canvasOptions.backgroundColor = null;
+        } else {
+            canvasOptions.backgroundColor = backgroundColor;
+        }
+        
+        html2canvas(selectedElement, canvasOptions).then(canvas => {
             console.log('Canvas创建成功:', canvas.width + 'x' + canvas.height);
+            
+            // 恢复原始样式
+            try {
+                originalStyles.forEach((fixes, el) => {
+                    Object.keys(fixes).forEach(prop => {
+                        if (fixes[prop]) {
+                            el.style[prop] = fixes[prop];
+                        } else {
+                            el.style.removeProperty(prop);
+                        }
+                    });
+                });
+                console.log('已恢复原始样式');
+            } catch (restoreError) {
+                console.warn('恢复原始样式时出错:', restoreError);
+            }
             
             try {
                 const link = document.createElement('a');
@@ -672,8 +809,77 @@
             
         }).catch(error => {
             console.error('导出失败:', error);
-            showToast('导出失败，请重试', 'error', 3000);
-            stopDownloadProcess();
+            
+            // 恢复原始样式
+            try {
+                originalStyles.forEach((fixes, el) => {
+                    Object.keys(fixes).forEach(prop => {
+                        if (fixes[prop]) {
+                            el.style[prop] = fixes[prop];
+                        } else {
+                            el.style.removeProperty(prop);
+                        }
+                    });
+                });
+                console.log('已恢复原始样式');
+            } catch (restoreError) {
+                console.warn('恢复原始样式时出错:', restoreError);
+            }
+            
+            // 如果是oklch颜色错误，提供更具体的错误信息
+            if (error.message && error.message.includes('oklch')) {
+                showToast('检测到不支持的CSS颜色格式，正在尝试备用方案...', 'info', 2000);
+                
+                // 尝试使用简化的配置重新导出
+                setTimeout(() => {
+                    const fallbackOptions = {
+                        allowTaint: true,
+                        useCORS: true,
+                        scale: 1, // 降低精度
+                        logging: false,
+                        backgroundColor: backgroundColor === 'original' ? null : backgroundColor,
+                        removeContainer: true,
+                        foreignObjectRendering: false // 禁用可能有问题的渲染
+                    };
+                    
+                    html2canvas(selectedElement, fallbackOptions).then(canvas => {
+                        console.log('备用方案导出成功:', canvas.width + 'x' + canvas.height);
+                        
+                        try {
+                            const link = document.createElement('a');
+                            const fileName = `html-export-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                            link.download = fileName;
+                            link.href = canvas.toDataURL('image/png');
+                            
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            showToast('备用方案导出成功！', 'success', 2000);
+                            
+                            setTimeout(() => {
+                                if (toolStatus === 'downloading') {
+                                    selectedElement = null;
+                                    isDownloading = false;
+                                    startSelection();
+                                }
+                            }, 800);
+                            
+                        } catch (downloadError) {
+                            console.error('备用方案下载失败:', downloadError);
+                            showToast('导出失败，请尝试选择其他元素', 'error', 3000);
+                            stopDownloadProcess();
+                        }
+                    }).catch(fallbackError => {
+                        console.error('备用方案也失败了:', fallbackError);
+                        showToast('导出失败，请尝试选择其他元素', 'error', 3000);
+                        stopDownloadProcess();
+                    });
+                }, 1000);
+            } else {
+                showToast('导出失败，请重试', 'error', 3000);
+                stopDownloadProcess();
+            }
         });
     }
     

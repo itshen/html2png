@@ -10,9 +10,42 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentTabId = null;
     let toolStatus = 'inactive'; // inactive, ready, selecting, downloading
     
+    // 从存储中恢复设置
+    function loadSettings() {
+        chrome.storage.sync.get(['backgroundColor', 'maxWidth'], function(result) {
+            // 设置背景选项
+            if (result.backgroundColor) {
+                const targetRadio = document.querySelector(`input[name="background"][value="${result.backgroundColor}"]`);
+                if (targetRadio) {
+                    targetRadio.checked = true;
+                }
+            }
+            
+            // 设置尺寸选项
+            if (result.maxWidth) {
+                sizeSelect.value = result.maxWidth;
+            }
+            
+            console.log('设置已恢复:', result);
+        });
+    }
+    
+    // 保存设置到存储
+    function saveSettings() {
+        const settings = {
+            backgroundColor: document.querySelector('input[name="background"]:checked').value,
+            maxWidth: sizeSelect.value
+        };
+        
+        chrome.storage.sync.set(settings, function() {
+            console.log('设置已保存:', settings);
+        });
+    }
+    
     // 获取当前标签页ID
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
         currentTabId = tabs[0].id;
+        loadSettings(); // 先恢复设置
         checkToolStatus();
     });
     
@@ -174,10 +207,16 @@ document.addEventListener('DOMContentLoaded', function() {
             maxWidth: sizeSelect.value
         };
         
-        chrome.tabs.sendMessage(currentTabId, {
-            action: 'updateSettings',
-            settings: settings
-        });
+        // 保存设置到本地存储
+        saveSettings();
+        
+        // 发送设置到content script
+        if (currentTabId) {
+            chrome.tabs.sendMessage(currentTabId, {
+                action: 'updateSettings',
+                settings: settings
+            });
+        }
     }
     
     // 监听设置变化
