@@ -27,6 +27,10 @@
         maxWidth: 'original'
     };
     
+    // 工具状态管理
+    let toolStatus = 'inactive'; // inactive, ready, selecting, downloading
+    let toastContainer = null;
+    
     // 样式常量
     const STYLES = {
         buttonContainer: `
@@ -39,7 +43,39 @@
             gap: 8px;
             align-items: flex-end;
         `,
+        mainPanel: `
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-width: 240px;
+        `,
+        statusIndicator: `
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        `,
+        statusDot: `
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #6c757d;
+        `,
+        statusDotActive: `
+            background: #28a745;
+            animation: pulse 2s infinite;
+        `,
+        statusDotDownloading: `
+            background: #17a2b8;
+            animation: pulse 1s infinite;
+        `,
         button: `
+            width: 100%;
             background: #007bff;
             color: white;
             border: none;
@@ -48,10 +84,16 @@
             font-size: 14px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+            box-shadow: 0 2px 8px rgba(0,123,255,0.3);
             transition: all 0.2s ease;
             user-select: none;
-            min-width: 80px;
+            margin-bottom: 8px;
+        `,
+        buttonSuccess: `
+            background: #28a745;
+        `,
+        buttonDanger: `
+            background: #dc3545;
         `,
         settingsButton: `
             width: 40px;
@@ -134,7 +176,7 @@
         `,
         settingsPanel: `
             position: fixed;
-            bottom: 80px;
+            bottom: 60px;
             right: 20px;
             background: white;
             border-radius: 12px;
@@ -142,7 +184,7 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.15);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             min-width: 240px;
-            z-index: 999998;
+            z-index: 1000000;
             opacity: 0;
             transform: translateY(10px);
             transition: all 0.2s ease;
@@ -153,10 +195,17 @@
             transform: translateY(0);
             pointer-events: auto;
         `,
-        toast: `
+        toastContainer: `
             position: fixed;
             top: 20px;
             right: 20px;
+            z-index: 1000000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        `,
+        toast: `
             background: #28a745;
             color: white;
             padding: 12px 20px;
@@ -165,7 +214,6 @@
             font-size: 14px;
             font-weight: 500;
             box-shadow: 0 4px 12px rgba(40,167,69,0.3);
-            z-index: 1000000;
             opacity: 0;
             transform: translateX(100%);
             transition: all 0.3s ease;
@@ -173,6 +221,7 @@
             align-items: center;
             gap: 8px;
             min-width: 200px;
+            pointer-events: auto;
         `,
         toastShow: `
             opacity: 1;
@@ -186,67 +235,92 @@
         `,
         toastError: `
             background: #dc3545;
+        `,
+        keyframes: `
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
+            }
         `
     };
     
-    // 显示Toast提示
-    function showToast(message, type = 'success', duration = 3000) {
-        // 移除现有toast
-        if (currentToast) {
-            currentToast.remove();
+    // 创建Toast容器
+    function createToastContainer() {
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.style.cssText = STYLES.toastContainer;
+            toastContainer.setAttribute('data-html-exporter', 'toast-container');
+            document.body.appendChild(toastContainer);
         }
+        return toastContainer;
+    }
+    
+    // 显示Toast提示（支持堆叠）
+    function showToast(message, type = 'success', duration = 3000) {
+        const container = createToastContainer();
         
         // 创建新的toast
-        currentToast = document.createElement('div');
-        currentToast.style.cssText = STYLES.toast;
-        currentToast.setAttribute('data-html-exporter', 'toast');
+        const toast = document.createElement('div');
+        toast.style.cssText = STYLES.toast;
+        toast.setAttribute('data-html-exporter', 'toast');
         
         // 添加图标
         let icon = '';
         if (type === 'success') {
-            currentToast.style.cssText += STYLES.toastSuccess;
+            toast.style.cssText += STYLES.toastSuccess;
             icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
             </svg>`;
         } else if (type === 'info') {
-            currentToast.style.cssText += STYLES.toastInfo;
+            toast.style.cssText += STYLES.toastInfo;
             icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
             </svg>`;
         } else if (type === 'error') {
-            currentToast.style.cssText += STYLES.toastError;
+            toast.style.cssText += STYLES.toastError;
             icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
             </svg>`;
         }
         
-        currentToast.innerHTML = `${icon}<span>${message}</span>`;
-        document.body.appendChild(currentToast);
+        toast.innerHTML = `${icon}<span>${message}</span>`;
+        container.appendChild(toast);
         
         // 显示动画
         setTimeout(() => {
-            currentToast.style.cssText += STYLES.toastShow;
+            toast.style.cssText += STYLES.toastShow;
         }, 10);
         
         // 自动隐藏
         setTimeout(() => {
-            if (currentToast) {
-                currentToast.style.opacity = '0';
-                currentToast.style.transform = 'translateX(100%)';
-                setTimeout(() => {
-                    if (currentToast) {
-                        currentToast.remove();
-                        currentToast = null;
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                    // 如果容器为空，清理容器
+                    if (container.children.length === 0) {
+                        container.remove();
+                        toastContainer = null;
                     }
-                }, 300);
-            }
+                }
+            }, 300);
         }, duration);
         
-        return currentToast;
+        return toast;
     }
 
-    // 创建按钮组
-    function createButtons() {
+    // 创建主面板
+    function createMainPanel() {
+        // 添加CSS动画到页面
+        if (!document.getElementById('html-exporter-styles')) {
+            const styleElement = document.createElement('style');
+            styleElement.id = 'html-exporter-styles';
+            styleElement.textContent = STYLES.keyframes;
+            document.head.appendChild(styleElement);
+        }
+        
         // 创建按钮容器
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = STYLES.buttonContainer;
@@ -254,6 +328,41 @@
         
         // 创建设置面板
         createSettingsPanel();
+        
+        // 创建主面板
+        const mainPanel = document.createElement('div');
+        mainPanel.style.cssText = STYLES.mainPanel;
+        mainPanel.setAttribute('data-html-exporter', 'main-panel');
+        
+        // 状态指示器
+        const statusIndicator = document.createElement('div');
+        statusIndicator.style.cssText = STYLES.statusIndicator;
+        statusIndicator.innerHTML = `
+            <div id="statusDot" style="${STYLES.statusDot}"></div>
+            <div id="statusText" style="font-size: 13px; color: #495057; font-weight: 500;">工具未激活</div>
+        `;
+        
+        // 主按钮
+        exportButton = document.createElement('button');
+        exportButton.id = 'startButton';
+        exportButton.textContent = '开始选择';
+        exportButton.style.cssText = STYLES.button;
+        exportButton.setAttribute('data-html-exporter', 'export');
+        exportButton.addEventListener('click', handleMainButtonClick);
+        
+        // 停止按钮
+        stopButton = document.createElement('button');
+        stopButton.id = 'stopButton';
+        stopButton.textContent = '停止';
+        stopButton.style.cssText = STYLES.button + STYLES.buttonDanger;
+        stopButton.style.display = 'none';
+        stopButton.setAttribute('data-html-exporter', 'stop');
+        stopButton.addEventListener('click', handleStopButtonClick);
+        
+        // 组装主面板
+        mainPanel.appendChild(statusIndicator);
+        mainPanel.appendChild(exportButton);
+        mainPanel.appendChild(stopButton);
         
         // 创建设置按钮（齿轮图标）
         settingsButton = document.createElement('button');
@@ -264,7 +373,10 @@
         `;
         settingsButton.style.cssText = STYLES.settingsButton;
         settingsButton.setAttribute('data-html-exporter', 'settings');
-        settingsButton.addEventListener('click', toggleSettingsPanel);
+        settingsButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSettingsPanel();
+        });
         
         // 设置按钮hover效果
         settingsButton.addEventListener('mouseenter', () => {
@@ -277,54 +389,13 @@
             settingsButton.style.transform = 'scale(1)';
         });
         
-        // 创建导出按钮
-        exportButton = document.createElement('button');
-        exportButton.textContent = '导出';
-        exportButton.style.cssText = STYLES.button;
-        exportButton.setAttribute('data-html-exporter', 'export');
-        
-        // 创建停止按钮
-        stopButton = document.createElement('button');
-        stopButton.textContent = '停止';
-        stopButton.style.cssText = STYLES.stopButton;
-        stopButton.setAttribute('data-html-exporter', 'stop');
-        stopButton.addEventListener('click', stopDownloadProcess);
-        
-        // 停止按钮hover效果
-        stopButton.addEventListener('mouseenter', () => {
-            if (isDownloading) {
-                stopButton.style.background = '#c82333';
-                stopButton.style.transform = 'translateY(-1px)';
-            }
-        });
-        
-        stopButton.addEventListener('mouseleave', () => {
-            if (isDownloading) {
-                stopButton.style.background = '#dc3545';
-                stopButton.style.transform = 'translateY(0)';
-            }
-        });
-        
-        // 导出按钮事件
-        exportButton.addEventListener('mouseenter', () => {
-            if (!isSelectionMode && !isDownloading) {
-                exportButton.style.cssText = STYLES.button + STYLES.buttonHover;
-            }
-        });
-        
-        exportButton.addEventListener('mouseleave', () => {
-            if (!isDownloading) {
-                exportButton.style.cssText = STYLES.button;
-            }
-        });
-        
-        exportButton.addEventListener('click', handleExportClick);
-        
-        // 组装按钮
+        // 组装按钮容器
         buttonContainer.appendChild(settingsButton);
-        buttonContainer.appendChild(exportButton);
-        buttonContainer.appendChild(stopButton);
+        buttonContainer.appendChild(mainPanel);
         document.body.appendChild(buttonContainer);
+        
+        // 初始化状态
+        updateUI(toolStatus);
     }
     
     // 创建设置面板
@@ -390,7 +461,7 @@
     
     // 切换设置面板显示
     function toggleSettingsPanel() {
-        const isVisible = settingsPanel.style.cssText.includes(STYLES.settingsPanelShow);
+        const isVisible = settingsPanel.classList.contains('settings-panel-show');
         
         if (isVisible) {
             hideSettingsPanel();
@@ -401,7 +472,11 @@
     
     // 显示设置面板
     function showSettingsPanel() {
-        settingsPanel.style.cssText = STYLES.settingsPanel + STYLES.settingsPanelShow;
+        settingsPanel.classList.add('settings-panel-show');
+        settingsPanel.style.opacity = '1';
+        settingsPanel.style.transform = 'translateY(0)';
+        settingsPanel.style.pointerEvents = 'auto';
+        
         // 添加点击外部关闭的事件监听，延迟以避免立即触发
         setTimeout(() => {
             document.addEventListener('click', handleOutsideClick, true);
@@ -410,8 +485,11 @@
     
     // 隐藏设置面板
     function hideSettingsPanel() {
-        if (settingsPanel && settingsPanel.style.cssText.includes(STYLES.settingsPanelShow)) {
-            settingsPanel.style.cssText = STYLES.settingsPanel;
+        if (settingsPanel && settingsPanel.classList.contains('settings-panel-show')) {
+            settingsPanel.classList.remove('settings-panel-show');
+            settingsPanel.style.opacity = '0';
+            settingsPanel.style.transform = 'translateY(10px)';
+            settingsPanel.style.pointerEvents = 'none';
             document.removeEventListener('click', handleOutsideClick, true);
         }
     }
@@ -419,32 +497,129 @@
     // 处理点击外部关闭设置面板
     function handleOutsideClick(e) {
         const isSettingsArea = settingsPanel.contains(e.target) || settingsButton.contains(e.target);
-        const isPanelVisible = settingsPanel.style.cssText.includes(STYLES.settingsPanelShow);
+        const isPanelVisible = settingsPanel.classList.contains('settings-panel-show');
         
         if (!isSettingsArea && isPanelVisible) {
             hideSettingsPanel();
         }
     }
     
-    // 处理导出按钮点击
-    function handleExportClick() {
-        if (isSelectionMode) {
-            exitSelectionMode();
-        } else if (selectedElement) {
-            // 已选择元素，直接导出
-            performDirectExport();
-        } else {
-            // 进入选择模式
-            enterSelectionMode();
+    // 更新UI状态
+    function updateUI(status) {
+        toolStatus = status;
+        
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        
+        if (!statusDot || !statusText || !startButton || !stopButton) return;
+        
+        switch (status) {
+            case 'inactive':
+                statusDot.style.cssText = STYLES.statusDot;
+                statusText.textContent = '点击开始选择';
+                startButton.textContent = '开始选择';
+                startButton.style.cssText = STYLES.button;
+                startButton.style.display = 'block';
+                stopButton.style.display = 'none';
+                break;
+                
+            case 'ready':
+                statusDot.style.cssText = STYLES.statusDot + STYLES.statusDotActive;
+                statusText.textContent = '点击开始选择';
+                startButton.textContent = '开始选择';
+                startButton.style.cssText = STYLES.button + STYLES.buttonSuccess;
+                startButton.style.display = 'block';
+                stopButton.style.display = 'none';
+                break;
+                
+            case 'selecting':
+                statusDot.style.cssText = STYLES.statusDot + STYLES.statusDotActive;
+                statusText.textContent = '正在选择元素...';
+                startButton.style.display = 'none';
+                stopButton.style.display = 'block';
+                break;
+                
+            case 'downloading':
+                statusDot.style.cssText = STYLES.statusDot + STYLES.statusDotDownloading;
+                statusText.textContent = '正在导出下载...';
+                startButton.style.display = 'none';
+                stopButton.style.display = 'block';
+                break;
         }
+    }
+    
+    // 处理主按钮点击
+    function handleMainButtonClick() {
+        // 只有在未激活或就绪状态才显示开始按钮
+        if (toolStatus === 'inactive' || toolStatus === 'ready') {
+            startExport(); // 激活并开始选择
+        }
+    }
+    
+    // 处理停止按钮点击
+    function handleStopButtonClick() {
+        if (toolStatus === 'selecting') {
+            exitSelectionMode();
+            updateUI('ready');
+        } else if (toolStatus === 'downloading') {
+            stopDownloadProcess();
+        }
+    }
+    
+    // 开始导出（合并了激活、选择和导出逻辑）
+    function startExport() {
+        if (toolStatus === 'inactive') {
+            // 先激活工具
+            updateUI('ready');
+            // 激活成功后开始选择
+            setTimeout(() => {
+                startSelection();
+            }, 300);
+        } else {
+            // 已激活，直接开始选择
+            startSelection();
+        }
+    }
+    
+    // 开始选择
+    function startSelection() {
+        updateSettings(); // 更新设置
+        updateUI('selecting');
+        enterSelectionMode();
+    }
+    
+    // 更新设置
+    function updateSettings() {
+        const bgRadios = document.querySelectorAll('[data-html-exporter="settings-panel"] input[name="background"]');
+        const sizeSelect = document.querySelector('[data-html-exporter="settings-panel"] #sizeSelect');
+        
+        if (bgRadios.length > 0) {
+            for (const radio of bgRadios) {
+                if (radio.checked) {
+                    globalSettings.backgroundColor = radio.value === 'transparent' ? 'transparent' : '#ffffff';
+                    break;
+                }
+            }
+        }
+        
+        if (sizeSelect) {
+            globalSettings.maxWidth = sizeSelect.value;
+        }
+    }
+    
+    // 处理导出按钮点击（保留兼容性）
+    function handleExportClick() {
+        handleMainButtonClick();
     }
     
     // 直接导出（无对话框）
     function performDirectExport() {
-        if (!selectedElement || isDownloading) return;
+        if (!selectedElement || toolStatus === 'downloading') return;
         
+        updateUI('downloading');
         isDownloading = true;
-        updateButtonStates();
         
         // 显示下载开始的toast
         showToast('开始导出...', 'info', 2000);
@@ -482,10 +657,10 @@
                 
                 // 下载完成后，自动重新进入选择模式
                 setTimeout(() => {
-                    if (isDownloading) { // 确保用户没有点击停止
+                    if (toolStatus === 'downloading') { // 确保用户没有点击停止
                         selectedElement = null;
                         isDownloading = false;
-                        enterSelectionMode();
+                        startSelection(); // 重新进入选择模式
                     }
                 }, 800);
                 
@@ -509,44 +684,11 @@
         if (isSelectionMode) {
             exitSelectionMode();
         }
+        updateUI('ready');
         showToast('已停止导出流程', 'info', 2000);
-        updateButtonStates();
     }
     
-    // 更新按钮状态
-    function updateButtonStates() {
-        if (isDownloading) {
-            exportButton.textContent = '处理中...';
-            exportButton.style.background = '#17a2b8';
-            stopButton.style.display = 'block';
-            
-            // 显示状态指示器
-            const statusIndicator = document.getElementById('downloadStatus');
-            if (statusIndicator) {
-                statusIndicator.style.display = 'block';
-            }
-        } else if (isSelectionMode) {
-            exportButton.textContent = '取消';
-            exportButton.style.background = '#dc3545';
-            stopButton.style.display = 'none';
-            
-            // 隐藏状态指示器
-            const statusIndicator = document.getElementById('downloadStatus');
-            if (statusIndicator) {
-                statusIndicator.style.display = 'none';
-            }
-        } else {
-            exportButton.textContent = selectedElement ? '导出' : '开始';
-            exportButton.style.background = '#007bff';
-            stopButton.style.display = 'none';
-            
-            // 隐藏状态指示器
-            const statusIndicator = document.getElementById('downloadStatus');
-            if (statusIndicator) {
-                statusIndicator.style.display = 'none';
-            }
-        }
-    }
+
     
     // 创建高亮覆盖层
     function createHighlightOverlay() {
@@ -574,8 +716,6 @@
     // 进入选择模式
     function enterSelectionMode() {
         isSelectionMode = true;
-        exportButton.textContent = '取消';
-        exportButton.style.background = '#dc3545';
         document.body.style.cursor = 'crosshair';
         
         // 隐藏设置面板
@@ -584,42 +724,89 @@
         // 显示提示
         showToast('点击页面元素开始导出', 'info', 3000);
         
-        // 添加事件监听器 - 使用capture阶段确保优先处理
-        document.addEventListener('mousemove', handleMouseMove, true);
-        document.addEventListener('click', handleElementClick, true);
+        // 添加事件监听器到阻塞覆盖层
+        if (blockingOverlay) {
+            blockingOverlay.addEventListener('mousemove', handleMouseMove, true);
+            blockingOverlay.addEventListener('click', handleElementClick, true);
+        }
+        
+        // 添加键盘事件监听器到document
         document.addEventListener('keydown', handleKeyDown, true);
         
         // 显示覆盖层
-        blockingOverlay.style.display = 'block';
-        highlightOverlay.style.display = 'block';
+        if (blockingOverlay && highlightOverlay) {
+            blockingOverlay.style.display = 'block';
+            highlightOverlay.style.display = 'block';
+        }
     }
     
     // 退出选择模式
     function exitSelectionMode() {
         isSelectionMode = false;
         document.body.style.cursor = '';
-        updateButtonStates();
         
-        // 移除事件监听器 - 必须与添加时的参数一致
-        document.removeEventListener('mousemove', handleMouseMove, true);
-        document.removeEventListener('click', handleElementClick, true);
+        // 移除事件监听器
+        if (blockingOverlay) {
+            blockingOverlay.removeEventListener('mousemove', handleMouseMove, true);
+            blockingOverlay.removeEventListener('click', handleElementClick, true);
+        }
         document.removeEventListener('keydown', handleKeyDown, true);
         
         // 隐藏覆盖层
-        highlightOverlay.style.display = 'none';
-        blockingOverlay.style.display = 'none';
+        if (highlightOverlay && blockingOverlay) {
+            highlightOverlay.style.display = 'none';
+            blockingOverlay.style.display = 'none';
+        }
+    }
+    
+    // 检查元素是否为工具相关元素
+    function isToolElement(element) {
+        if (!element) return true;
+        
+        // 检查是否为工具元素或其子元素
+        const toolElement = element.closest('[data-html-exporter]');
+        if (toolElement) return true;
+        
+        // 检查是否为特定的工具元素
+        if (element === exportButton || element === settingsButton || element === stopButton || 
+            element === highlightOverlay || element === blockingOverlay ||
+            element === settingsPanel || element === toastContainer) {
+            return true;
+        }
+        
+        // 检查是否在工具容器内或Toast容器内
+        const toolContainers = document.querySelectorAll('[data-html-exporter]');
+        for (const container of toolContainers) {
+            if (container.contains(element)) return true;
+        }
+        
+        // 检查是否在Toast容器内
+        if (toastContainer && toastContainer.contains(element)) {
+            return true;
+        }
+        
+        return false;
     }
     
     // 处理鼠标移动
     function handleMouseMove(e) {
-        if (!isSelectionMode) return;
+        if (!isSelectionMode || !highlightOverlay || !blockingOverlay) {
+            return;
+        }
         
+        // 暂时隐藏阻塞覆盖层来获取下面的元素
+        blockingOverlay.style.display = 'none';
         const element = document.elementFromPoint(e.clientX, e.clientY);
         blockingOverlay.style.display = 'block';
         
-        if (!element || element === exportButton || element === highlightOverlay || element === blockingOverlay) return;
+        // 忽略工具相关元素
+        if (isToolElement(element)) {
+            highlightOverlay.style.display = 'none';
+            return;
+        }
         
         const rect = element.getBoundingClientRect();
+        highlightOverlay.style.display = 'block';
         highlightOverlay.style.left = rect.left + 'px';
         highlightOverlay.style.top = rect.top + 'px';
         highlightOverlay.style.width = rect.width + 'px';
@@ -633,13 +820,19 @@
         e.preventDefault();
         e.stopPropagation();
         
+        // 暂时隐藏阻塞覆盖层来获取下面的元素
+        blockingOverlay.style.display = 'none';
         const element = document.elementFromPoint(e.clientX, e.clientY);
         blockingOverlay.style.display = 'block';
         
-        if (!element || element === exportButton || element === highlightOverlay || element === blockingOverlay) return;
+        // 忽略工具相关元素
+        if (isToolElement(element)) return;
         
         selectedElement = element;
         exitSelectionMode();
+        
+        // 显示选择成功的提示
+        showToast(`已选择: ${element.tagName.toLowerCase()}${element.className ? '.' + element.className.split(' ')[0] : ''}`, 'info', 1000);
         
         // 选择元素后立即开始导出
         setTimeout(() => {
@@ -649,8 +842,9 @@
     
     // 处理键盘事件
     function handleKeyDown(e) {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' && isSelectionMode) {
             exitSelectionMode();
+            updateUI('ready');
         }
     }
     
@@ -833,11 +1027,11 @@
         // 加载html2canvas库
         loadHtml2Canvas().then(() => {
             // 创建UI元素
-            createButtons();
+            createMainPanel();
             createHighlightOverlay();
             createBlockingOverlay();
             
-            console.log('HTML导出PNG工具已加载完成，新版本带有连续选择功能');
+            // HTML导出PNG工具已加载完成
         }).catch(error => {
             console.error('加载html2canvas库失败:', error);
             showToast('工具初始化失败，请检查网络连接', 'error', 5000);
