@@ -6,13 +6,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusText = document.getElementById('statusText');
     const sizeSelect = document.getElementById('sizeSelect');
     const backgroundRadios = document.querySelectorAll('input[name="background"]');
+    const marginEnabledCheckbox = document.getElementById('marginEnabled');
+    const marginSettings = document.getElementById('marginSettings');
+    const marginSizeInput = document.getElementById('marginSize');
     
     let currentTabId = null;
     let toolStatus = 'inactive'; // inactive, ready, selecting, downloading
     
     // 从存储中恢复设置
     function loadSettings() {
-        chrome.storage.sync.get(['backgroundColor', 'maxWidth'], function(result) {
+        chrome.storage.sync.get(['backgroundColor', 'maxWidth', 'marginEnabled', 'marginSize'], function(result) {
             // 设置背景选项
             if (result.backgroundColor) {
                 const targetRadio = document.querySelector(`input[name="background"][value="${result.backgroundColor}"]`);
@@ -26,6 +29,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 sizeSelect.value = result.maxWidth;
             }
             
+            // 设置边距选项
+            if (result.marginEnabled !== undefined) {
+                marginEnabledCheckbox.checked = result.marginEnabled;
+                marginSettings.style.display = result.marginEnabled ? 'block' : 'none';
+            }
+            
+            if (result.marginSize !== undefined) {
+                marginSizeInput.value = result.marginSize;
+            }
+            
             console.log('设置已恢复:', result);
         });
     }
@@ -34,7 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveSettings() {
         const settings = {
             backgroundColor: document.querySelector('input[name="background"]:checked').value,
-            maxWidth: sizeSelect.value
+            maxWidth: sizeSelect.value,
+            marginEnabled: marginEnabledCheckbox.checked,
+            marginSize: parseInt(marginSizeInput.value) || 50
         };
         
         chrome.storage.sync.set(settings, function() {
@@ -204,7 +219,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSettings() {
         const settings = {
             backgroundColor: document.querySelector('input[name="background"]:checked').value,
-            maxWidth: sizeSelect.value
+            maxWidth: sizeSelect.value,
+            marginEnabled: marginEnabledCheckbox.checked,
+            marginSize: parseInt(marginSizeInput.value) || 50
         };
         
         // 保存设置到本地存储
@@ -225,6 +242,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     sizeSelect.addEventListener('change', updateSettings);
+    
+    // 边距功能事件监听
+    marginEnabledCheckbox.addEventListener('change', function() {
+        marginSettings.style.display = this.checked ? 'block' : 'none';
+        updateSettings();
+    });
+    
+    marginSizeInput.addEventListener('change', updateSettings);
     
     // 监听来自content script的状态更新
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {

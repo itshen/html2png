@@ -11,6 +11,7 @@
     
     let isSelectionMode = false;
     let selectedElement = null;
+    let currentHoveredElement = null; // 跟踪当前悬停的元素
     let exportButton = null;
     let settingsButton = null;
     let stopButton = null;
@@ -24,7 +25,9 @@
     // 全局设置
     let globalSettings = {
         backgroundColor: 'transparent',
-        maxWidth: 'original'
+        maxWidth: 'original',
+        marginEnabled: false,
+        marginSize: 50
     };
     
     // 工具状态管理
@@ -435,7 +438,7 @@
                 </div>
             </div>
             
-            <div style="margin-bottom: 0;">
+            <div style="margin-bottom: 16px;">
                 <label style="display: block; margin-bottom: 6px; color: #555; font-size: 14px; font-weight: 500;">尺寸:</label>
                 <select id="sizeSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
                     <option value="original">原始尺寸</option>
@@ -444,6 +447,25 @@
                     <option value="1600">1600px宽</option>
                     <option value="1920">1920px宽</option>
                 </select>
+            </div>
+            
+            <div style="margin-bottom: 0;">
+                <label style="display: flex; align-items: center; margin-bottom: 8px; color: #555; font-size: 14px; font-weight: 500; cursor: pointer;">
+                    <input type="checkbox" id="marginEnabled" style="margin-right: 8px;">
+                    增加边距
+                </label>
+                <div id="marginSettings" style="display: none; margin-left: 20px; padding: 12px; background: #f8f9fa; border-radius: 6px;">
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: block; margin-bottom: 4px; color: #666; font-size: 13px;">边距大小:</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="marginSize" value="50" min="0" max="200" style="width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                            <span style="color: #666; font-size: 13px;">px</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: #888; line-height: 1.4;">
+                        边距背景将跟随上方的背景设置
+                    </div>
+                </div>
             </div>
         `;
         
@@ -466,6 +488,24 @@
         const sizeSelect = settingsPanel.querySelector('#sizeSelect');
         sizeSelect.addEventListener('change', (e) => {
             globalSettings.maxWidth = e.target.value;
+        });
+        
+        // 边距功能事件绑定
+        const marginEnabledCheckbox = settingsPanel.querySelector('#marginEnabled');
+        const marginSettings = settingsPanel.querySelector('#marginSettings');
+        const marginSizeInput = settingsPanel.querySelector('#marginSize');
+        
+        marginEnabledCheckbox.addEventListener('change', function() {
+            globalSettings.marginEnabled = this.checked;
+            if (this.checked) {
+                marginSettings.style.display = 'block';
+            } else {
+                marginSettings.style.display = 'none';
+            }
+        });
+        
+        marginSizeInput.addEventListener('change', function() {
+            globalSettings.marginSize = parseInt(this.value) || 50;
         });
     }
     
@@ -642,8 +682,10 @@
         
         const backgroundColor = globalSettings.backgroundColor;
         const maxWidth = globalSettings.maxWidth;
+        const marginEnabled = globalSettings.marginEnabled;
+        const marginSize = marginEnabled ? globalSettings.marginSize : 0;
         
-        console.log('开始导出...', { backgroundColor, maxWidth });
+        console.log('开始导出...', { backgroundColor, maxWidth, marginEnabled, marginSize });
         
         // 预先处理页面中的oklch颜色，防止html2canvas解析错误
         const originalStyles = new Map();
@@ -761,6 +803,43 @@
         html2canvas(selectedElement, canvasOptions).then(canvas => {
             console.log('Canvas创建成功:', canvas.width + 'x' + canvas.height);
             
+            let finalCanvas = canvas;
+            
+            // 如果启用了边距功能，创建带边距的画布
+            if (marginSize > 0) {
+                console.log('开始处理边距功能...');
+                
+                // 创建新的画布，尺寸为原画布 + 边距
+                const newCanvas = document.createElement('canvas');
+                const newWidth = canvas.width + marginSize * 2;
+                const newHeight = canvas.height + marginSize * 2;
+                newCanvas.width = newWidth;
+                newCanvas.height = newHeight;
+                
+                const ctx = newCanvas.getContext('2d');
+                
+                // 设置边距背景（跟随主背景设置）
+                if (backgroundColor === '#ffffff') {
+                    // 白色背景
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, newWidth, newHeight);
+                } else if (backgroundColor === 'original') {
+                    // 原文档背景：获取页面背景色
+                    const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+                    const htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+                    const pageBackground = bodyBg !== 'rgba(0, 0, 0, 0)' ? bodyBg : (htmlBg !== 'rgba(0, 0, 0, 0)' ? htmlBg : '#ffffff');
+                    ctx.fillStyle = pageBackground;
+                    ctx.fillRect(0, 0, newWidth, newHeight);
+                }
+                // 透明背景不需要填充
+                
+                // 将原始截图放在新画布的中心
+                ctx.drawImage(canvas, marginSize, marginSize);
+                
+                finalCanvas = newCanvas;
+                console.log('边距处理完成，新尺寸:', newWidth + 'x' + newHeight);
+            }
+            
             // 恢复原始样式
             try {
                 originalStyles.forEach((fixes, el) => {
@@ -781,7 +860,7 @@
                 const link = document.createElement('a');
                 const fileName = `html-export-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
                 link.download = fileName;
-                link.href = canvas.toDataURL('image/png');
+                link.href = finalCanvas.toDataURL('image/png');
                 
                 document.body.appendChild(link);
                 link.click();
@@ -845,11 +924,41 @@
                     html2canvas(selectedElement, fallbackOptions).then(canvas => {
                         console.log('备用方案导出成功:', canvas.width + 'x' + canvas.height);
                         
+                        let finalCanvas = canvas;
+                        
+                        // 备用方案也支持边距功能
+                        if (marginSize > 0) {
+                            console.log('备用方案：开始处理边距功能...');
+                            
+                            const newCanvas = document.createElement('canvas');
+                            const newWidth = canvas.width + marginSize * 2;
+                            const newHeight = canvas.height + marginSize * 2;
+                            newCanvas.width = newWidth;
+                            newCanvas.height = newHeight;
+                            
+                            const ctx = newCanvas.getContext('2d');
+                            
+                            if (backgroundColor === '#ffffff') {
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillRect(0, 0, newWidth, newHeight);
+                            } else if (backgroundColor === 'original') {
+                                const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+                                const htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+                                const pageBackground = bodyBg !== 'rgba(0, 0, 0, 0)' ? bodyBg : (htmlBg !== 'rgba(0, 0, 0, 0)' ? htmlBg : '#ffffff');
+                                ctx.fillStyle = pageBackground;
+                                ctx.fillRect(0, 0, newWidth, newHeight);
+                            }
+                            
+                            ctx.drawImage(canvas, marginSize, marginSize);
+                            finalCanvas = newCanvas;
+                            console.log('备用方案：边距处理完成，新尺寸:', newWidth + 'x' + newHeight);
+                        }
+                        
                         try {
                             const link = document.createElement('a');
                             const fileName = `html-export-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
                             link.download = fileName;
-                            link.href = canvas.toDataURL('image/png');
+                            link.href = finalCanvas.toDataURL('image/png');
                             
                             document.body.appendChild(link);
                             link.click();
@@ -928,12 +1037,13 @@
         hideSettingsPanel();
         
         // 显示提示
-        showToast('点击页面元素开始导出', 'info', 3000);
+        showToast('左键点击选择元素，右键选择父级元素', 'info', 3000);
         
         // 添加事件监听器到阻塞覆盖层
         if (blockingOverlay) {
             blockingOverlay.addEventListener('mousemove', handleMouseMove, true);
             blockingOverlay.addEventListener('click', handleElementClick, true);
+            blockingOverlay.addEventListener('contextmenu', handleRightClick, true);
         }
         
         // 添加键盘事件监听器到document
@@ -955,6 +1065,7 @@
         if (blockingOverlay) {
             blockingOverlay.removeEventListener('mousemove', handleMouseMove, true);
             blockingOverlay.removeEventListener('click', handleElementClick, true);
+            blockingOverlay.removeEventListener('contextmenu', handleRightClick, true);
         }
         document.removeEventListener('keydown', handleKeyDown, true);
         
@@ -1008,8 +1119,12 @@
         // 忽略工具相关元素
         if (isToolElement(element)) {
             highlightOverlay.style.display = 'none';
+            currentHoveredElement = null;
             return;
         }
+        
+        // 更新当前悬停的元素
+        currentHoveredElement = element;
         
         const rect = element.getBoundingClientRect();
         highlightOverlay.style.display = 'block';
@@ -1026,10 +1141,15 @@
         e.preventDefault();
         e.stopPropagation();
         
-        // 暂时隐藏阻塞覆盖层来获取下面的元素
-        blockingOverlay.style.display = 'none';
-        const element = document.elementFromPoint(e.clientX, e.clientY);
-        blockingOverlay.style.display = 'block';
+        // 优先使用当前悬停的元素（可能是通过右键选择的父级）
+        let element = currentHoveredElement;
+        
+        // 如果没有当前悬停元素，则获取鼠标位置的元素
+        if (!element) {
+            blockingOverlay.style.display = 'none';
+            element = document.elementFromPoint(e.clientX, e.clientY);
+            blockingOverlay.style.display = 'block';
+        }
         
         // 忽略工具相关元素
         if (isToolElement(element)) return;
@@ -1038,12 +1158,68 @@
         exitSelectionMode();
         
         // 显示选择成功的提示
-        showToast(`已选择: ${element.tagName.toLowerCase()}${element.className ? '.' + element.className.split(' ')[0] : ''}`, 'info', 1000);
+        const tagName = element.tagName.toLowerCase();
+        const className = element.className ? '.' + element.className.split(' ')[0] : '';
+        const id = element.id ? '#' + element.id : '';
+        showToast(`已选择: ${tagName}${id}${className}`, 'success', 1000);
         
         // 选择元素后立即开始导出
         setTimeout(() => {
             performDirectExport();
         }, 200); // 给用户一点时间看到选择效果
+    }
+    
+    // 处理右键点击 - 选择父级元素（不导出）
+    function handleRightClick(e) {
+        if (!isSelectionMode) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 使用当前悬停的元素，如果没有则获取鼠标位置的元素
+        let currentElement = currentHoveredElement;
+        if (!currentElement) {
+            // 暂时隐藏阻塞覆盖层来获取下面的元素
+            blockingOverlay.style.display = 'none';
+            currentElement = document.elementFromPoint(e.clientX, e.clientY);
+            blockingOverlay.style.display = 'block';
+        }
+        
+        // 忽略工具相关元素
+        if (isToolElement(currentElement)) return;
+        
+        // 查找父级元素
+        let parentElement = currentElement.parentElement;
+        
+        // 跳过工具相关的父级元素
+        while (parentElement && isToolElement(parentElement)) {
+            parentElement = parentElement.parentElement;
+        }
+        
+        // 如果找到有效的父级元素
+        if (parentElement && parentElement !== document.body && parentElement !== document.documentElement) {
+            // 更新当前悬停元素为父级元素，支持连续右键
+            currentHoveredElement = parentElement;
+            
+            // 更新高亮显示
+            const rect = parentElement.getBoundingClientRect();
+            if (highlightOverlay) {
+                highlightOverlay.style.left = rect.left + 'px';
+                highlightOverlay.style.top = rect.top + 'px';
+                highlightOverlay.style.width = rect.width + 'px';
+                highlightOverlay.style.height = rect.height + 'px';
+                highlightOverlay.style.display = 'block';
+            }
+            
+            // 显示父级元素信息，但不退出选择模式
+            const tagName = parentElement.tagName.toLowerCase();
+            const className = parentElement.className ? '.' + parentElement.className.split(' ')[0] : '';
+            const id = parentElement.id ? '#' + parentElement.id : '';
+            showToast(`已切换到父级: ${tagName}${id}${className}`, 'info', 1500);
+        } else {
+            // 已经是最顶级的元素了
+            showToast('已经是最顶级的可选元素', 'warning', 1500);
+        }
     }
     
     // 处理键盘事件

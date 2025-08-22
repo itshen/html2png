@@ -7,6 +7,10 @@
     // 监听来自popup的消息
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         switch(request.action) {
+            case 'getStatus':
+                sendResponse({status: isToolActive ? 'ready' : 'inactive'});
+                break;
+                
             case 'checkStatus':
                 sendResponse({isActive: isToolActive});
                 break;
@@ -19,6 +23,33 @@
             case 'deactivate':
                 deactivateTool();
                 sendResponse({success: true});
+                break;
+                
+            case 'startSelection':
+                if (window.htmlToPngExporter && window.htmlToPngExporter.startSelection) {
+                    window.htmlToPngExporter.startSelection();
+                    sendResponse({success: true});
+                } else {
+                    sendResponse({success: false});
+                }
+                break;
+                
+            case 'cancelSelection':
+                if (window.htmlToPngExporter && window.htmlToPngExporter.cancelSelection) {
+                    window.htmlToPngExporter.cancelSelection();
+                    sendResponse({success: true});
+                } else {
+                    sendResponse({success: false});
+                }
+                break;
+                
+            case 'updateSettings':
+                if (window.htmlToPngExporter && window.htmlToPngExporter.updateSettings) {
+                    window.htmlToPngExporter.updateSettings(request.settings);
+                    sendResponse({success: true});
+                } else {
+                    sendResponse({success: false});
+                }
                 break;
         }
     });
