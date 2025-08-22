@@ -3,12 +3,27 @@
     'use strict';
     
     let isToolActive = false;
+    let currentStatus = 'inactive'; // 跟踪当前实际状态
     
     // 监听来自popup的消息
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         switch(request.action) {
             case 'getStatus':
-                sendResponse({status: isToolActive ? 'ready' : 'inactive'});
+                console.log('[Content] 收到getStatus请求');
+                console.log('[Content] isToolActive:', isToolActive);
+                console.log('[Content] window.htmlToPngExporter:', !!window.htmlToPngExporter);
+                console.log('[Content] window.htmlToPngExporter.getStatus:', !!(window.htmlToPngExporter && window.htmlToPngExporter.getStatus));
+                
+                // 如果工具激活，尝试从html-exporter-combined.js获取真实状态
+                if (isToolActive && window.htmlToPngExporter && window.htmlToPngExporter.getStatus) {
+                    const realStatus = window.htmlToPngExporter.getStatus();
+                    console.log('[Content] 从html-exporter获取到状态:', realStatus);
+                    sendResponse({status: realStatus});
+                } else {
+                    const fallbackStatus = isToolActive ? 'ready' : 'inactive';
+                    console.log('[Content] 使用fallback状态:', fallbackStatus);
+                    sendResponse({status: fallbackStatus});
+                }
                 break;
                 
             case 'checkStatus':
@@ -16,6 +31,7 @@
                 break;
                 
             case 'activate':
+                console.log('[Content] 收到activate消息');
                 activateTool();
                 sendResponse({success: true});
                 break;
@@ -26,10 +42,16 @@
                 break;
                 
             case 'startSelection':
+                console.log('[Content] 收到startSelection请求');
+                console.log('[Content] window.htmlToPngExporter存在:', !!window.htmlToPngExporter);
+                console.log('[Content] startSelection方法存在:', !!(window.htmlToPngExporter && window.htmlToPngExporter.startSelection));
+                
                 if (window.htmlToPngExporter && window.htmlToPngExporter.startSelection) {
+                    console.log('[Content] 调用startSelection方法');
                     window.htmlToPngExporter.startSelection();
                     sendResponse({success: true});
                 } else {
+                    console.log('[Content] startSelection方法不存在');
                     sendResponse({success: false});
                 }
                 break;
@@ -56,8 +78,12 @@
     
     // 激活工具
     function activateTool() {
-        if (isToolActive) return;
+        if (isToolActive) {
+            console.log('[Content] 工具已经激活，跳过');
+            return;
+        }
         
+        console.log('[Content] 激活工具，设置isToolActive = true');
         isToolActive = true;
         
         // 通知background更新状态

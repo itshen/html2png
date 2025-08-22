@@ -66,15 +66,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 检查工具状态
     function checkToolStatus() {
-        if (!currentTabId) return;
+        if (!currentTabId) {
+            console.log('[Popup] checkToolStatus: 没有当前标签页ID');
+            return;
+        }
         
+        console.log('[Popup] 发送getStatus消息到标签页:', currentTabId);
         chrome.tabs.sendMessage(currentTabId, {action: 'getStatus'}, function(response) {
             if (chrome.runtime.lastError) {
-                // 工具未注入
+                console.log('[Popup] 工具未注入，错误:', chrome.runtime.lastError);
                 updateUI('inactive');
             } else if (response) {
+                console.log('[Popup] 收到状态响应:', response);
                 updateUI(response.status);
             } else {
+                console.log('[Popup] 没有收到响应');
                 updateUI('inactive');
             }
         });
@@ -82,6 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 更新UI状态
     function updateUI(status) {
+        console.log('[Popup] 更新UI状态:', status, '当前toolStatus:', toolStatus);
         toolStatus = status;
         
         switch (status) {
@@ -125,6 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 开始按钮点击事件
     startButton.addEventListener('click', function() {
+        console.log('[Popup] 开始按钮被点击，currentTabId:', currentTabId, 'toolStatus:', toolStatus);
         if (!currentTabId) return;
         
         // 只有在未激活或就绪状态才显示开始按钮
@@ -171,6 +179,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 等待脚本初始化
                 setTimeout(() => {
+                    // 通知content.js激活工具
+                    chrome.tabs.sendMessage(currentTabId, {action: 'activate'}, function(response) {
+                        console.log('[Popup] 激活通知响应:', response);
+                    });
                     updateSettings();
                     updateUI('ready');
                     resolve();
@@ -181,15 +193,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 开始导出（合并了激活、选择和导出逻辑）
     function startExport() {
+        console.log('[Popup] startExport被调用，toolStatus:', toolStatus);
         if (toolStatus === 'inactive') {
+            console.log('[Popup] 工具未激活，先激活工具');
             // 先激活工具
             activateTool().then(() => {
+                console.log('[Popup] 工具激活成功，300ms后开始选择');
                 // 激活成功后开始选择
                 setTimeout(() => {
                     startSelection();
                 }, 300);
             });
         } else {
+            console.log('[Popup] 工具已激活，直接开始选择');
             // 已激活，直接开始选择
             startSelection();
         }
@@ -197,11 +213,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 开始选择
     function startSelection() {
-        updateSettings(); // 更新设置
-        
+        console.log('[Popup] startSelection被调用，发送startSelection消息');
         chrome.tabs.sendMessage(currentTabId, {action: 'startSelection'}, function(response) {
+            console.log('[Popup] startSelection响应:', response);
             if (response && response.success) {
+                console.log('[Popup] 开始选择成功，更新UI为selecting');
                 updateUI('selecting');
+            } else {
+                console.log('[Popup] 开始选择失败');
             }
         });
     }

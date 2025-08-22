@@ -26,7 +26,11 @@
     'use strict';
     
     // 确保只初始化一次
-    if (window.htmlToPngExporter && window.htmlToPngExporter.initialized) return;
+    if (window.htmlToPngExporter && window.htmlToPngExporter.initialized) {
+        console.log('[Combined] 已经初始化过，跳过');
+        return;
+    }
+    console.log('[Combined] 开始初始化 htmlToPngExporter');
     window.htmlToPngExporter = { initialized: true };
     
     let isSelectionMode = false;
@@ -255,12 +259,13 @@
     
     // 通知popup状态变化
     function notifyStatusChange(status) {
+        console.log('[Combined] notifyStatusChange:', status, '之前状态:', toolStatus);
         toolStatus = status;
         chrome.runtime.sendMessage({
             action: 'statusUpdate',
             status: status
-        }).catch(() => {
-            // popup可能已关闭，忽略错误
+        }).catch((error) => {
+            console.log('[Combined] 发送状态更新失败:', error);
         });
     }
     
@@ -1390,30 +1395,7 @@
         enterSelectionMode();
     }
     
-    // 进入选择模式
-    function enterSelectionMode() {
-        isSelectionMode = true;
-        document.body.style.cursor = 'crosshair';
-        
-        // 显示提示
-        showToast('左键点击选择元素，右键选择父级元素', 'info', 3000);
-        
-        // 添加事件监听器到阻塞覆盖层
-        if (blockingOverlay) {
-            blockingOverlay.addEventListener('mousemove', handleMouseMove, true);
-            blockingOverlay.addEventListener('click', handleElementClick, true);
-            blockingOverlay.addEventListener('contextmenu', handleRightClick, true);
-        }
-        
-        // 添加键盘事件监听器到document
-        document.addEventListener('keydown', handleKeyDown, true);
-        
-        // 显示覆盖层
-        if (blockingOverlay && highlightOverlay) {
-            blockingOverlay.style.display = 'block';
-            highlightOverlay.style.display = 'block';
-        }
-    }
+
     
     // 退出选择模式
     function exitSelectionMode() {
@@ -1480,8 +1462,10 @@
 
     // 初始化
     function init() {
+        console.log('[Combined] init() 被调用，document.readyState:', document.readyState);
         // 等待DOM加载完成
         if (document.readyState === 'loading') {
+            console.log('[Combined] DOM还在加载，等待DOMContentLoaded');
             document.addEventListener('DOMContentLoaded', init);
             return;
         }
@@ -1499,8 +1483,12 @@
     
     // 暴露API供浏览器插件调用
     window.htmlToPngExporter.startSelection = function() {
+        console.log('[Combined] startSelection被调用，当前toolStatus:', toolStatus);
         if (toolStatus === 'ready' || toolStatus === 'inactive') {
+            console.log('[Combined] 状态允许，调用startExport');
             startExport();
+        } else {
+            console.log('[Combined] 状态不允许开始选择');
         }
     };
     
@@ -1511,6 +1499,11 @@
         } else if (toolStatus === 'downloading') {
             stopDownloadProcess();
         }
+    };
+    
+    window.htmlToPngExporter.getStatus = function() {
+        console.log('[Combined] getStatus被调用，当前toolStatus:', toolStatus);
+        return toolStatus;
     };
     
     window.htmlToPngExporter.updateSettings = function(settings) {
