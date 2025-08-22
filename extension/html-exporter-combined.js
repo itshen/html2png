@@ -1440,6 +1440,49 @@
             blockingOverlay.style.display = 'none';
         }
     }
+    
+    // 检查元素是否为工具相关元素
+    function isToolElement(element) {
+        if (!element) return true;
+        
+        // 检查是否为工具元素或其子元素
+        const toolElement = element.closest('[data-html-exporter]');
+        if (toolElement) return true;
+        
+        // 检查是否在Toast容器内
+        if (toastContainer && toastContainer.contains(element)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // 更新UI状态（插件版本使用popup管理状态）
+    function updateUI(status) {
+        toolStatus = status;
+        // 通知popup状态变化
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+            chrome.runtime.sendMessage({
+                action: 'statusUpdate',
+                status: status
+            });
+        }
+    }
+    
+    // 开始导出（合并了激活、选择和导出逻辑）
+    function startExport() {
+        if (toolStatus === 'inactive') {
+            // 先激活工具
+            updateUI('ready');
+            // 激活成功后开始选择
+            setTimeout(() => {
+                startSelection();
+            }, 300);
+        } else {
+            // 已激活，直接开始选择
+            startSelection();
+        }
+    }
 
     // 初始化
     function init() {
