@@ -259,33 +259,6 @@
     });
     
     // 通知popup状态变化
-    // 检测CSP限制
-    function detectCSPRestrictions() {
-        try {
-            // 检查当前页面的CSP策略
-            const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
-            if (metaCSP) {
-                const cspContent = metaCSP.getAttribute('content') || '';
-                console.log('[Combined] 检测到CSP策略:', cspContent);
-                
-                // 检查是否有严格的connect-src限制
-                if (cspContent.includes('connect-src') && !cspContent.includes('*') && !cspContent.includes('data:')) {
-                    return { hasRestrictions: true, type: 'connect-src' };
-                }
-                
-                // 检查是否有严格的script-src限制
-                if (cspContent.includes('script-src') && !cspContent.includes('unsafe-eval') && !cspContent.includes('*')) {
-                    return { hasRestrictions: true, type: 'script-src' };
-                }
-            }
-            
-            return { hasRestrictions: false };
-        } catch (error) {
-            console.warn('[Combined] CSP检测失败:', error);
-            return { hasRestrictions: false };
-        }
-    }
-
     function notifyStatusChange(status) {
         console.log('[Combined] notifyStatusChange:', status, '之前状态:', toolStatus);
         toolStatus = status;
@@ -372,21 +345,14 @@
         
         // 根据背景设置配置html2canvas选项
         const canvasOptions = {
-            allowTaint: false, // 避免CSP问题
-            useCORS: false,    // 避免CSP问题
-            foreignObjectRendering: false, // 禁用可能触发CSP的功能
-            removeContainer: true,         // 避免容器相关的CSP问题
+            allowTaint: true,
+            useCORS: true,
             scale: 2,
             logging: false,
             width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
             height: undefined,
             ignoreElements: function(element) {
-                // 忽略可能触发CSP或包含不支持CSS的元素
-                if (element.tagName === 'SCRIPT' || element.tagName === 'IFRAME' || 
-                    element.tagName === 'OBJECT' || element.tagName === 'EMBED' ||
-                    element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
-                    return true;
-                }
+                // 忽略可能包含不支持CSS的元素
                 return false;
             },
             onclone: function(clonedDoc) {
@@ -495,10 +461,9 @@
                 
                 // 下载完成后，自动重新进入选择模式
                 setTimeout(() => {
-                    if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
+                    if (isDownloading) { // 确保用户没有点击停止
                         selectedElement = null;
                         isDownloading = false;
-                        updateUI('selecting'); // 先更新状态
                         enterSelectionMode();
                     }
                 }, 800);
@@ -535,23 +500,13 @@
                 // 尝试使用简化的配置重新导出
                 setTimeout(() => {
                     const fallbackOptions = {
-                        allowTaint: false, // CSP安全配置
-                        useCORS: false,    // CSP安全配置
+                        allowTaint: true,
+                        useCORS: true,
                         scale: 1, // 降低精度
                         logging: false,
                         backgroundColor: backgroundColor === 'original' ? null : backgroundColor,
                         removeContainer: true,
-                        foreignObjectRendering: false, // 禁用可能有问题的渲染
-                        ignoreElements: function(element) {
-                            // 在备用方案中更加保守地忽略问题元素
-                            if (element.tagName === 'SCRIPT' || element.tagName === 'IFRAME' || 
-                                element.tagName === 'OBJECT' || element.tagName === 'EMBED' ||
-                                element.tagName === 'VIDEO' || element.tagName === 'AUDIO' ||
-                                element.tagName === 'CANVAS' || element.tagName === 'SVG') {
-                                return true;
-                            }
-                            return false;
-                        }
+                        foreignObjectRendering: false // 禁用可能有问题的渲染
                     };
                     
                     html2canvas(selectedElement, fallbackOptions).then(canvas => {
@@ -570,11 +525,11 @@
                             showToast('备用方案导出成功！', 'success', 2000);
                             
                             setTimeout(() => {
-                                if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
+                                if (toolStatus === 'downloading') {
                                     selectedElement = null;
                                     isDownloading = false;
-                                    updateUI('selecting'); // 先更新状态
                                     enterSelectionMode();
+                                    notifyStatusChange('selecting');
                                 }
                             }, 800);
                             
@@ -590,14 +545,7 @@
                     });
                 }, 1000);
             } else {
-                // 检查是否是CSP相关错误
-                if (error.message && (error.message.includes('Content Security Policy') || 
-                    error.message.includes('CSP') || error.message.includes('connect-src') ||
-                    error.message.includes('Refused to connect') || error.message.includes('document.write'))) {
-                    showToast('网站安全策略限制，部分功能可能无法使用。请尝试其他元素或网站。', 'error', 4000);
-                } else {
-                    showToast('导出失败，请重试', 'error', 3000);
-                }
+                showToast('导出失败，请重试', 'error', 3000);
                 stopDownloadProcess();
             }
         });
@@ -607,14 +555,13 @@
     
     // 停止下载流程
     function stopDownloadProcess() {
-        console.log('[Combined] stopDownloadProcess: 强制重置状态');
         isDownloading = false;
         selectedElement = null;
-        updateUI('ready'); // 确保状态正确更新
         if (isSelectionMode) {
             exitSelectionMode();
         }
         showToast('已停止导出流程', 'info', 2000);
+        notifyStatusChange('ready');
     }
     
 
@@ -944,10 +891,8 @@
         
         // 根据背景设置配置html2canvas选项
         const canvasOptions = {
-            allowTaint: false, // 避免CSP问题
-            useCORS: false,    // 避免CSP问题
-            foreignObjectRendering: false, // 禁用可能触发CSP的功能
-            removeContainer: true,         // 避免容器相关的CSP问题
+            allowTaint: true,
+            useCORS: true,
             scale: 2, // 高清导出
             logging: false, // 关闭日志
             width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
@@ -1129,13 +1074,6 @@
         
         console.log('开始导出...', { backgroundColor, maxWidth, marginEnabled, marginSize });
         
-        // 检测CSP限制
-        const cspCheck = detectCSPRestrictions();
-        if (cspCheck.hasRestrictions) {
-            console.warn('[Combined] 检测到CSP限制:', cspCheck.type);
-            showToast('检测到网站安全限制，将使用兼容模式导出', 'info', 2000);
-        }
-        
         // 预先处理页面中的oklch颜色，防止html2canvas解析错误
         const originalStyles = new Map();
         try {
@@ -1169,21 +1107,14 @@
         
         // 根据背景设置配置html2canvas选项
         const canvasOptions = {
-            allowTaint: false, // 避免CSP问题
-            useCORS: false,    // 避免CSP问题
-            foreignObjectRendering: false, // 禁用可能触发CSP的功能
-            removeContainer: true,         // 避免容器相关的CSP问题
+            allowTaint: true,
+            useCORS: true,
             scale: 2,
             logging: false,
             width: maxWidth === 'original' ? undefined : parseInt(maxWidth),
             height: undefined,
             ignoreElements: function(element) {
-                // 忽略可能触发CSP或包含不支持CSS的元素
-                if (element.tagName === 'SCRIPT' || element.tagName === 'IFRAME' || 
-                    element.tagName === 'OBJECT' || element.tagName === 'EMBED' ||
-                    element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
-                    return true;
-                }
+                // 忽略可能包含不支持CSS的元素
                 return false;
             },
             onclone: function(clonedDoc) {
@@ -1329,11 +1260,10 @@
                 
                 // 下载完成后，自动重新进入选择模式
                 setTimeout(() => {
-                    if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
+                    if (toolStatus === 'downloading') { // 确保用户没有点击停止
                         selectedElement = null;
                         isDownloading = false;
-                        updateUI('selecting'); // 先更新状态
-                        enterSelectionMode();
+                        startSelection(); // 重新进入选择模式
                     }
                 }, 800);
                 
@@ -1369,23 +1299,13 @@
                 // 尝试使用简化的配置重新导出
                 setTimeout(() => {
                     const fallbackOptions = {
-                        allowTaint: false, // CSP安全配置
-                        useCORS: false,    // CSP安全配置
+                        allowTaint: true,
+                        useCORS: true,
                         scale: 1, // 降低精度
                         logging: false,
                         backgroundColor: backgroundColor === 'original' ? null : backgroundColor,
                         removeContainer: true,
-                        foreignObjectRendering: false, // 禁用可能有问题的渲染
-                        ignoreElements: function(element) {
-                            // 在备用方案中更加保守地忽略问题元素
-                            if (element.tagName === 'SCRIPT' || element.tagName === 'IFRAME' || 
-                                element.tagName === 'OBJECT' || element.tagName === 'EMBED' ||
-                                element.tagName === 'VIDEO' || element.tagName === 'AUDIO' ||
-                                element.tagName === 'CANVAS' || element.tagName === 'SVG') {
-                                return true;
-                            }
-                            return false;
-                        }
+                        foreignObjectRendering: false // 禁用可能有问题的渲染
                     };
                     
                     html2canvas(selectedElement, fallbackOptions).then(canvas => {
@@ -1434,11 +1354,10 @@
                             showToast('备用方案导出成功！', 'success', 2000);
                             
                             setTimeout(() => {
-                                if (isDownloading && toolStatus === 'downloading') { // 双重检查状态
+                                if (toolStatus === 'downloading') {
                                     selectedElement = null;
                                     isDownloading = false;
-                                    updateUI('selecting'); // 先更新状态
-                                    enterSelectionMode();
+                                    startSelection();
                                 }
                             }, 800);
                             
@@ -1454,14 +1373,7 @@
                     });
                 }, 1000);
             } else {
-                // 检查是否是CSP相关错误
-                if (error.message && (error.message.includes('Content Security Policy') || 
-                    error.message.includes('CSP') || error.message.includes('connect-src') ||
-                    error.message.includes('Refused to connect') || error.message.includes('document.write'))) {
-                    showToast('网站安全策略限制，部分功能可能无法使用。请尝试其他元素或网站。', 'error', 4000);
-                } else {
-                    showToast('导出失败，请重试', 'error', 3000);
-                }
+                showToast('导出失败，请重试', 'error', 3000);
                 stopDownloadProcess();
             }
         });
@@ -1469,13 +1381,12 @@
     
     // 停止下载流程
     function stopDownloadProcess() {
-        console.log('[Combined] stopDownloadProcess: 强制重置状态');
         isDownloading = false;
         selectedElement = null;
-        updateUI('ready'); // 确保状态正确更新
         if (isSelectionMode) {
             exitSelectionMode();
         }
+        updateUI('ready');
         showToast('已停止导出流程', 'info', 2000);
     }
     
